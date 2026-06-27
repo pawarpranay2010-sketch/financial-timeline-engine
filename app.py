@@ -218,9 +218,9 @@ if st.sidebar.button("🚀 Process & Generate Timeline Memo"):
 
         # Narrative Synthesis Output
         st.subheader("📝 AI-Generated Investment Narrative")
-        summary_prompt = f"Analyze these raw timeline fragments for {ticker} and structure a brief investment thesis summarizing core growth trends and management credibility gaps based on changes in performance metrics over time."
-                with st.spinner("Synthesizing timeline memo narrative..."):
-            ai_narrative = call_openrouter_private(summary_prompt)
-            st.write(ai_narrative)
+            summary_prompt = f"Analyze these raw timeline fragments for {ticker} and structure a brief investment thesis summarizing core growth trends and management credibility gaps based on changes in performance metrics over time."
+            with st.spinner("Synthesizing timeline memo narrative..."):
+                ai_narrative = call_openrouter_private(summary_prompt)
+                st.write(ai_narrative)
                     
           
