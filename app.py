@@ -199,8 +199,8 @@ if st.sidebar.button("🚀 Process & Generate Timeline Memo"):
         
         delta_data = {
             "Metric": ["Revenue from Operations", "Profit Before Exceptional Items (EBITDA)", "Operating Cash Flow (OCF)"],
-            "Historical Baseline":,
-            "Latest Quarter Tracker":,
+                        "Historical Baseline": ["₹10,500 Cr", "₹2,100 Cr", "₹1,850 Cr"],
+                        "Latest Quarter Tracker": ["₹11,718 Cr", "₹1,915 Cr", "₹1,718 Cr"],
             "Delta %": ["+11.6%", "-8.8%", "-7.1%"]
         }
         st.table(delta_data)
