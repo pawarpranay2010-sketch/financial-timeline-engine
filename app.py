@@ -21,7 +21,8 @@ if "rag_cache" not in st.session_state:
 # CONSTANTS & CONFIGURATION
 # ---------------------------------------------------------
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY")
-PRIMARY_MODEL = "google/gemini-2.5-flash"
+PRIMARY_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+
 FALLBACK_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 
 # ---------------------------------------------------------
