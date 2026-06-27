@@ -1,4 +1,5 @@
 import streamlit as st
+import io
 import pdfplumber
 from pptx import Presentation
 from docx import Document
