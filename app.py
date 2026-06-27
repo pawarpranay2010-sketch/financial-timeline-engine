@@ -1,4 +1,4 @@
-                import streamlit as st
+import streamlit as st
 import io
 import pdfplumber
 from pptx import Presentation
@@ -20,17 +20,30 @@ PRIMARY_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 FALLBACK_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 
 # ---------------------------------------------------------
-# UI HEADER & PRIVACY BANNER
+# UI HEADER, BRANDING & PRIVACY BANNER
 # ---------------------------------------------------------
 st.set_page_config(page_title="Financial Timeline Engine", layout="wide")
+
+# Custom Visual Logo Brand Header using clean HTML/CSS Markdown
+st.markdown(
+    """
+    <div style="background-color:#1E293B; padding:20px; border-radius:10px; margin-bottom:20px; display:flex; align-items:center;">
+        <div style="background-color:#38BDF8; color:#1E293B; font-weight:bold; font-size:24px; padding:10px 18px; border-radius:8px; margin-right:20px; font-family:sans-serif;">
+            FT-ENG
+        </div>
+        <div>
+            <h1 style="color:#F8FAFC; margin:0; font-size:26px; font-family:sans-serif;">FINANCIAL TIMELINE ENGINE</h1>
+            <p style="color:#94A3B8; margin:0; font-size:14px; font-family:sans-serif;">BSE/NSE Localized Institutional Decision Support Platform</p>
+        </div>
+    </div>
+    """, 
+    unsafe_html=True
+)
 
 st.info(
     "🔒 **Enterprise Privacy Active**: Documents are processed securely in active server memory "
     "and purged instantly after report generation. Your data is never used for AI model training."
 )
-
-st.title("📈 Multi-Modal Unified Timeline Engine")
-st.subheader("BSE/NSE Localized Institutional Decision Support Platform")
 
 # ---------------------------------------------------------
 # HIGH-SPEED MEMORY EXTRACTION UTILITIES
@@ -207,19 +220,4 @@ if st.sidebar.button("🚀 Process & Generate Timeline Memo"):
         st.subheader("📝 AI-Generated Investment Narrative")
         summary_prompt = f"Analyze these raw timeline fragments for {ticker} and structure a brief investment thesis summarizing core growth trends and management credibility gaps based on changes in performance metrics over time."
         with st.spinner("Synthesizing timeline memo narrative..."):
-            ai_narrative = call_openrouter_private(summary_prompt)
-            st.write(ai_narrative)
-
-        # Word Exporter Generator
-        doc = Document()
-        doc.add_heading(f"INVESTMENT TIMELINE REPORT: {ticker}", level=1)
-        doc.add_paragraph("Report generated securely via Institutional Decision Support Platform.")
-        doc.add_heading("Financial Delta Overview", level=2)
-        
-        table = doc.add_table(rows=1, cols=4)
-        hdr_cells = table.rows[0].cells
-        hdr_cells[0].text = 'Metric'
-        hdr_cells[1].text = 'Historical Baseline'
-        hdr_cells[2].text = 'Latest Tracker'
-        hdr_cells[3].text = 'Delta %'
-        
+          
