@@ -284,19 +284,23 @@ if st.sidebar.button("🚀 Process & Generate Timeline Memo"):
                     
                     st.success("Thank you! Your feedback has been structured and securely stored in our development ledger.")
 
-        # 4. Hidden Admin Download Portal (Only visible to you if you type your admin keyword)
-        admin_gate = st.text_input("🛠️ Admin Ledger Export Access (Internal Use Only):", type="password")
-        if admin_gate == "export123":
-            import os
-            if os.path.isfile("feedback_ledger.csv"):
-                with open("feedback_ledger.csv", "rb") as f:
-                    st.download_button(
-                        label="📥 Download Structured Feedback Data (.csv)",
-                        data=f,
-                        file_name="user_feedback_analytics.csv",
-                        mime="text/csv"
-                    )
-            else:
-                st.info("The data ledger is currently empty. No user feedback has been recorded yet.")
-                
-            
+        # ---------------------------------------------------------
+# GOOGLE SHEETS USER FEEDBACK LOGGER
+# ---------------------------------------------------------
+st.markdown("---")
+st.subheader("💬 Institutional User Feedback Panel")
+st.caption("Help us improve the Multi-Modal Timeline Engine. Share your feature requests or report data mismatches.")
+
+with st.form("feedback_form", clear_on_submit=True):
+    user_email = st.text_input("Your Professional Email (Optional)")
+    feedback_type = st.selectbox("Feedback Category", ["Feature Request", "Data Discrepancy", "Model Performance", "General Inquiry"])
+    feedback_text = st.text_area("Detailed Message / Observations")
+    
+    submitted = st.form_submit_button("🚀 Submit Securely to Admin")
+    
+    if submitted:
+        if not feedback_text.strip():
+            st.error("Please enter a message before submitting.")
+        else:
+            # Google Form Form-Response Webhook destination URL
+            form_url = "
