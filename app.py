@@ -284,7 +284,7 @@ if st.sidebar.button("🚀 Process & Generate Timeline Memo"):
                     
                     st.success("Thank you! Your feedback has been structured and securely stored in our development ledger.")
 
-        # ---------------------------------------------------------
+# ---------------------------------------------------------
 # GOOGLE SHEETS USER FEEDBACK LOGGER
 # ---------------------------------------------------------
 st.markdown("---")
