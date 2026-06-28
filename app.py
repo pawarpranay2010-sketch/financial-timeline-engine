@@ -298,26 +298,4 @@ with st.form("feedback_form", clear_on_submit=True):
     
     submitted = st.form_submit_button("🚀 Submit Securely to Admin")
     
-    if submitted:
-        if not feedback_text.strip():
-            st.error("Please enter a message before submitting.")
-        else:
-            # Google Form Form-Response Webhook destination URL
-            form_url = "https://google.com"
-
-            
-             
-            payload = {
-                 "entry.1762875148": user_email,
-                 "entry.1554849047": feedback_type,
-                 "entry.1968966174": feedback_text
-             }
-             
-            try:
-                 response = requests.post(form_url, data=payload, timeout=10)
-                 if response.status_code == 200 or response.status_code == 0:
-                     st.success("🎉 Thank you! Your feedback has been saved directly to the Admin Google Sheet.")
-                 else:
-                     st.warning("Feedback sent, but server status was unusual. We will review it shortly!")
-             except Exception as e:
-                    st.error(f"Failed to stream feedback to Google Sheets: {str(e)}")
+    if submitted: if not feedback_text.strip(): st.error("Please enter a message before submitting.") else: # Google Form Form-Response Webhook destination URL form_url = "https://google.com" payload = { "entry.1762875148": user_email, "entry.1554849047": feedback_type, "entry.1968966174": feedback_text } try: response = requests.post(form_url, data=payload, timeout=10) if response.status_code == 200 or response.status_code == 0: st.success("🎉 Thank you! Your feedback has been saved directly to the Admin Google Sheet.") else: st.warning("Feedback sent, but server status was unusual. We will review it shortly!") except Exception as e: st.error(f"Failed to stream feedback to Google Sheets: {str(e)}")
