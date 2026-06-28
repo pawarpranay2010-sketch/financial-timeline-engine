@@ -10,8 +10,8 @@ from docx import Document
 # ---------------------------------------------------------
 st.set_page_config(page_title="Multi-Modal Timeline Engine", page_icon="📈", layout="wide")
 
-PRIMARY_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
-FALLBACK_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+PRIMARY_MODEL = "google/gemma-4-31b-it:free"
+FALLBACK_MODEL = "google/gemma-4-31b-it:free"
 
 # ---------------------------------------------------------
 # TIME SERIES LEDGER ENGINE
