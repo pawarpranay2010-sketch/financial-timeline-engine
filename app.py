@@ -168,7 +168,7 @@ def call_openrouter_private(prompt_content):
 
 # ---------------------------------------------------------
 # FRONTEND CONTROL PANEL
-# ---------------------------------------------------------
+ledger = TimeSeriesLedger()
 st.sidebar.header("📁 Document Ingestion Panel")
 ticker = st.sidebar.text_input("Enter Company Ticker (e.g., TATA MOTORS)", value="TATA MOTORS")
 
@@ -181,7 +181,7 @@ if st.sidebar.button("🚀 Process & Generate Timeline Memo"):
     if not (uploaded_annual or uploaded_quarterly):
         st.error("Please upload at least one core financial document to begin.")
     else:
-        ledger = TimeSeriesLedger()
+         
         
         with st.status("Running Secure Data Ingestion...", expanded=True) as status:
             if uploaded_annual:
