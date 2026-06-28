@@ -349,12 +349,12 @@ if submitted:
         }
 
         try:
-    response = requests.post(
-        form_url,
-        data=payload,
-        timeout=10,
-        allow_redirects=False
-    )
+            response = requests.post(
+                                     form_url,
+                                     data=payload,
+                                     timeout=10,
+                                     allow_redirects=False
+            )
 
     if response.status_code in [200, 302]:
         st.success("🎉 Thank you! Your feedback has been submitted successfully.")
