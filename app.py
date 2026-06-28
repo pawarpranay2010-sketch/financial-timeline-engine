@@ -210,3 +210,33 @@ if st.sidebar.button("🚀 Process & Generate Timeline Memo"):
         with st.spinner("Synthesizing multi-modal financial timeline memo narrative via secure AI link..."):
             ai_narrative = call_openrouter_private(summary_prompt)
             st.write(ai_narrative)
+                    # ---------------------------------------------------------
+        # EXPORT GENERATED MEMO TO WORD DOCUMENT UNIT
+        # ---------------------------------------------------------
+        try:
+            doc = Document()
+            doc.add_heading(f"FINANCIAL TIMELINE ENGINE REPORT: {ticker}", 0)
+            doc.add_paragraph("🔒 Enterprise Privacy Active - Institutional Grade Memo\n")
+            
+            doc.add_heading("1. Financial Summary Table Data", level=1)
+            for m, hb, lq, d in zip(delta_data["Metric"], delta_data["Historical Baseline"], delta_data["Latest Quarter Tracker"], delta_data["Delta %"]):
+                doc.add_paragraph(f"- {m}: Baseline: {hb} | Latest: {lq} | Delta: {d}")
+                
+            doc.add_heading("2. AI-Generated Investment Narrative Summary", level=1)
+            doc.add_paragraph(str(ai_narrative))
+            
+            # Save Document into buffer bytes memory loop
+            doc_buffer = io.BytesIO()
+            doc.save(doc_buffer)
+            doc_buffer.seek(0)
+            
+            st.markdown("---")
+            st.download_button(
+                label="📥 Download Word Report (.docx)",
+                data=doc_buffer,
+                file_name=f"{ticker}_Timeline_Memo.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+        except Exception as doc_err:
+            st.error(f"Word Builder Export System Encountered a Minor Interruption: {str(doc_err)}")
+            
