@@ -303,4 +303,5 @@ with st.form("feedback_form", clear_on_submit=True):
             st.error("Please enter a message before submitting.")
         else:
             # Google Form Form-Response Webhook destination URL
-            form_url = "
+            form_url = "https://google.com"
+
