@@ -240,4 +240,62 @@ if st.sidebar.button("🚀 Process & Generate Timeline Memo"):
             )
         except Exception as doc_err:
             st.error(f"Word Builder Export System Encountered a Minor Interruption: {str(doc_err)}")
+                    # ---------------------------------------------------------
+        # UPGRADED DATA-DRIVEN FEEDBACK SYSTEMS WORKSPACE
+        # ---------------------------------------------------------
+        st.markdown("---")
+        st.subheader("💬 Help Us Refine the Engine")
+        st.caption("Share your honest workflow experience. All insights are reviewed directly by the development team.")
+
+        with st.form("advanced_feedback_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                user_role = st.selectbox("Your Professional Role:", ["Junior Analyst", "Investment Intern", "Portfolio Manager", "Retail Investor", "Other"])
+                rating = st.slider("Rate your overall experience (1 = Poor, 5 = Excellent):", 1, 5, 4)
+            with col2:
+                user_return = st.radio("Would you use this utility again in your research loop?", ["Yes", "Maybe", "No"])
+                email = st.text_input("Email Address (Optional, for development follow-up):")
+
+            comments = st.text_area("What was the biggest problem you encountered or the one feature you wish this tool had?")
+            
+            submit_feedback = st.form_submit_button("Submit Anonymous Evaluation")
+            
+            if submit_feedback:
+                if comments.strip() == "":
+                    st.warning("Please share your feedback or the feature you wish the tool had before submitting!")
+                else:
+                    import os
+                    import csv
+                    
+                    # 1. Structure the data rows cleanly for data filtering
+                    feedback_file = "feedback_ledger.csv"
+                    file_exists = os.path.isfile(feedback_file)
+                    
+                    # 2. Append data instantly into a local spreadsheet file in server memory
+                    with open(feedback_file, mode="a", newline="", encoding="utf-8") as f:
+                        writer = csv.writer(f)
+                        if not file_exists:
+                            writer.writerow(["Role", "Rating", "Return Intent", "Email", "Comments"])
+                        writer.writerow([user_role, rating, user_return, email if email else "N/A", comments])
+                    
+                    # 3. Mirror the print log to the console backend system
+                    print(f"\n📥 DATA LOGGED: {user_role} | Rating: {rating} | Return: {user_return} | Mail: {email}")
+                    
+                    st.success("Thank you! Your feedback has been structured and securely stored in our development ledger.")
+
+        # 4. Hidden Admin Download Portal (Only visible to you if you type your admin keyword)
+        admin_gate = st.text_input("🛠️ Admin Ledger Export Access (Internal Use Only):", type="password")
+        if admin_gate == "export123":
+            import os
+            if os.path.isfile("feedback_ledger.csv"):
+                with open("feedback_ledger.csv", "rb") as f:
+                    st.download_button(
+                        label="📥 Download Structured Feedback Data (.csv)",
+                        data=f,
+                        file_name="user_feedback_analytics.csv",
+                        mime="text/csv"
+                    )
+            else:
+                st.info("The data ledger is currently empty. No user feedback has been recorded yet.")
+                
             
