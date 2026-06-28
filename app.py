@@ -298,4 +298,56 @@ with st.form("feedback_form", clear_on_submit=True):
     
     submitted = st.form_submit_button("🚀 Submit Securely to Admin")
     
-    if submitted: if not feedback_text.strip(): st.error("Please enter a message before submitting.") else: # Google Form Form-Response Webhook destination URL form_url = "https://google.com" payload = { "entry.1762875148": user_email, "entry.1554849047": feedback_type, "entry.1968966174": feedback_text } try: response = requests.post(form_url, data=payload, timeout=10) if response.status_code == 200 or response.status_code == 0: st.success("🎉 Thank you! Your feedback has been saved directly to the Admin Google Sheet.") else: st.warning("Feedback sent, but server status was unusual. We will review it shortly!") except Exception as e: st.error(f"Failed to stream feedback to Google Sheets: {str(e)}")
+    # ---------------------------------------------------------
+# USER FEEDBACK UNIT
+# ---------------------------------------------------------
+
+st.markdown("---")
+st.subheader("💬 Share Your Feedback")
+st.caption(
+    "Help improve the Financial Timeline Engine by sharing your experience."
+)
+
+with st.form("feedback_form", clear_on_submit=True):
+
+    user_email = st.text_input(
+        "Email (Optional)"
+    )
+
+    feedback_type = st.selectbox(
+        "Feedback Type",
+        [
+            "General Feedback",
+            "Bug Report",
+            "Feature Request",
+            "UI Suggestion",
+            "Performance Issue"
+        ]
+    )
+
+    feedback_text = st.text_area(
+        "Your Feedback",
+        placeholder="Tell us what worked well or what could be improved..."
+    )
+
+    submitted = st.form_submit_button("📨 Submit Feedback")
+
+if submitted:
+
+    if not feedback_text.strip():
+        st.error("Please enter a message before submitting.")
+
+    else:
+
+        # Your Google Form formResponse URL
+        form_url = "https://docs.google.com/forms/d/e/1FAIpQLSdFxrYNNNm0VlJxL_4QLvQizcwZwm2CzP6hpyJm-Atfqh5gdQ/formResponse"
+
+        payload = {
+            "entry.1762875148": user_email,
+            "entry.1554849047": feedback_type,
+            "entry.1968966174": feedback_text
+        }
+
+        try:
+
+           
