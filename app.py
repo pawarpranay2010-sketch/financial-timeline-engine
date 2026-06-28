@@ -356,7 +356,7 @@ if submitted:
                                      allow_redirects=False
        )
 
-    if response.status_code in [200, 302]:
+        if response.status_code in [200, 302]:
         st.success("🎉 Thank you! Your feedback has been submitted successfully.")
     else:
         st.error(f"Submission failed ({response.status_code})")
