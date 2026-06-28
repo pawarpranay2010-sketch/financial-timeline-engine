@@ -243,6 +243,7 @@ if st.sidebar.button("🚀 Process & Generate Timeline Memo"):
                     # ---------------------------------------------------------
         # UPGRADED DATA-DRIVEN FEEDBACK SYSTEMS WORKSPACE
         # ---------------------------------------------------------
+        if st.query_params.get("admin") == "true":
         st.markdown("---")
         st.subheader("💬 Help Us Refine the Engine")
         st.caption("Share your honest workflow experience. All insights are reviewed directly by the development team.")
