@@ -10,8 +10,9 @@ from docx import Document
 # ---------------------------------------------------------
 st.set_page_config(page_title="Multi-Modal Timeline Engine", page_icon="📈", layout="wide")
 
-PRIMARY_MODEL = "google/gemma-4-31b-it:free"
-FALLBACK_MODEL = "deepseek/deepseek-r1:free"
+PRIMARY_MODEL = "openrouter/free"
+FALLBACK_MODEL = "openrouter/free"
+
 
 # ---------------------------------------------------------
 # TIME SERIES LEDGER ENGINE
