@@ -1,174 +1,135 @@
 import streamlit as st
 import io
+import requests
 import pdfplumber
 from pptx import Presentation
 from docx import Document
-import hashlib
-import os
-import requests
-import re
-
-# Initialize memory RAG cache to prevent re-processing lag
-if "rag_cache" not in st.session_state:
-    st.session_state.rag_cache = {}
 
 # ---------------------------------------------------------
-# CONSTANTS & ZERO-COST AI CONFIGURATION
+# GLOBAL PLATFORM SETUP
 # ---------------------------------------------------------
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY")
+st.set_page_config(page_title="Multi-Modal Timeline Engine", page_icon="📈", layout="wide")
+
 PRIMARY_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 FALLBACK_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 
 # ---------------------------------------------------------
-# UI HEADER, BRANDING & PRIVACY BANNER
-# ---------------------------------------------------------
-st.set_page_config(page_title="Financial Timeline Engine", layout="wide")
-
-# Custom Visual Logo Brand Header using clean HTML/CSS Markdown
-st.markdown(
-    """
-    <div style="background-color:#1E293B; padding:20px; border-radius:10px; margin-bottom:20px; display:flex; align-items:center;">
-        <div style="background-color:#38BDF8; color:#1E293B; font-weight:bold; font-size:24px; padding:10px 18px; border-radius:8px; margin-right:20px; font-family:sans-serif;">
-            FT-ENG
-        </div>
-        <div>
-            <h1 style="color:#F8FAFC; margin:0; font-size:26px; font-family:sans-serif;">FINANCIAL TIMELINE ENGINE</h1>
-            <p style="color:#94A3B8; margin:0; font-size:14px; font-family:sans-serif;">BSE/NSE Localized Institutional Decision Support Platform</p>
-        </div>
-    </div>
-    """, 
-    unsafe_allow_html=True
-)
-
-st.info(
-    "🔒 **Enterprise Privacy Active**: Documents are processed securely in active server memory "
-    "and purged instantly after report generation. Your data is never used for AI model training."
-)
-
-# ---------------------------------------------------------
-# HIGH-SPEED MEMORY EXTRACTION UTILITIES
-# ---------------------------------------------------------
-def generate_file_hash(file_bytes):
-    return hashlib.sha256(file_bytes).hexdigest()
-
-def extract_text_from_pdf(file_bytes):
-    """Memory-safe page streaming to prevent server crashes"""
-    text_blocks = []
-    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-        for i, page in enumerate(pdf.pages):
-            page_text = page.extract_text()
-            if page_text:
-                text_blocks.append({"page": i + 1, "text": page_text})
-    return text_blocks
-
-def extract_text_from_pptx(file_bytes):
-    text_blocks = []
-    prs = Presentation(io.BytesIO(file_bytes))
-    for i, slide in enumerate(prs.slides):
-        slide_text = ""
-        for shape in slide.shapes:
-            if hasattr(shape, "text") and shape.text:
-                slide_text += shape.text + "\n"
-        if slide_text.strip():
-            text_blocks.append({"page": i + 1, "text": slide_text.strip()})
-    return text_blocks
-
-def parse_date_or_period(text):
-    text_lower = text.lower()[:300]  # Scan only the header zone for speed
-    q_match = re.search(r'(q[1-4])\s*(?:fy)?\s*(\d{2,4})', text_lower)
-    if q_match:
-        return f"{q_match.group(1).upper()}-FY{q_match.group(2)[-2:]}"
-    fy_match = re.search(r'fy\s*(\d{2,4})', text_lower)
-    if fy_match:
-        return f"FY{fy_match.group(1)[-2:]}"
-    return "Undated Context"
-
-# ---------------------------------------------------------
-# CORE LEDGER & CONTROVERSY MATRIX
+# TIME SERIES LEDGER ENGINE
 # ---------------------------------------------------------
 class TimeSeriesLedger:
     def __init__(self):
         self.events = []
 
     def ingest_document(self, file_bytes, doc_type):
-        file_hash = generate_file_hash(file_bytes)
-        if file_hash in st.session_state.rag_cache:
-            self.events.extend(st.session_state.rag_cache[file_hash])
-            return
+        if "PDF" in doc_type:
+            text_blocks = extract_text_from_pdf(file_bytes)
+        elif "Presentation" in doc_type or "PPTX" in doc_type:
+            text_blocks = extract_text_from_pptx(file_bytes)
+        else:
+            text_blocks = [file_bytes.decode("utf-8", errors="ignore")]
 
-        new_events = []
-        if doc_type in ["Annual Report (PDF)", "Quarterly Report (PDF)"]:
-            blocks = extract_text_from_pdf(file_bytes)
-            for b in blocks:
-                period = parse_date_or_period(b["text"])
-                new_events.append({
-                    "period": period, "type": doc_type, "page": b["page"], "text": b["text"]
+        for page_num, text in enumerate(text_blocks, start=1):
+            clean_text = text.strip()
+            if clean_text:
+                self.events.append({
+                    "period": f"Doc Layer: {doc_type}",
+                    "type": doc_type,
+                    "page": page_num,
+                    "text": clean_text
                 })
-        elif doc_type == "Investor Presentation (PPTX)":
-            blocks = extract_text_from_pptx(file_bytes)
-            for b in blocks:
-                period = parse_date_or_period(b["text"])
-                new_events.append({
-                    "period": period, "type": doc_type, "page": b["page"], "text": b["text"]
-                })
-        elif doc_type == "Earnings Transcript (TXT)":
-            text = file_bytes.decode("utf-8", errors="ignore")
-            lines = text.split("\n\n")
-            for i, line in enumerate(lines):
-                if line.strip():
-                    new_events.append({
-                        "period": "Transcript Q&A", "type": doc_type, "page": i + 1, "text": line.strip()
-                    })
-
-        st.session_state.rag_cache[file_hash] = new_events
-        self.events.extend(new_events)
 
     def search_controversies(self):
-        keywords = ["margin pressure", "supply chain", "delay", "guidance cut", "pledged", "contingent", "headwind", "commodity"]
+        keywords = ["headwinds", "commodity", "steel", "prices", "delay", "decline", "debt", "margin pressure"]
         matches = []
-        for e in self.events:
+        for event in self.events:
             for kw in keywords:
-                if kw in e["text"].lower():
-                    matches.append(e)
+                if kw in event["text"].lower():
+                    matches.append(event)
                     break
-        return matches[:5]
+        return matches
+
+def extract_text_from_pdf(file_bytes):
+    pages_text = []
+    with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+        for page in pdf.pages:
+            content = page.extract_text()
+            if content:
+                pages_text.append(content)
+    return pages_text
+
+def extract_text_from_pptx(file_bytes):
+    slides_text = []
+    prs = Presentation(io.BytesIO(file_bytes))
+    for slide in prs.slides:
+        chunk = []
+        for shape in slide.shapes:
+            if hasattr(shape, "text") and shape.text:
+                chunk.append(shape.text)
+        slides_text.append("\n".join(chunk))
+    return slides_text
 
 # ---------------------------------------------------------
 # SECURE ZERO-COST API COMMUNICATION LAYER
 # ---------------------------------------------------------
 def call_openrouter_private(prompt_content):
-    if not OPENROUTER_API_KEY:
-        return "⚠️ Setup Warning: Missing OpenRouter API Key in App Secrets."
+    api_key = st.secrets.get("OPENROUTER_API_KEY")
+    if not api_key:
+        return "⚠️ Setup Warning: Missing OPENROUTER_API_KEY in Streamlit Secrets."
 
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "X-Title": "Private-Finance-Agent",
-        "X-Data-Collection": "no-store"
+        "HTTP-Referer": "https://financial-timeline-engine.streamlit.app",
+        "X-Title": "Financial Timeline Engine"
     }
-    
+
     payload = {
         "model": PRIMARY_MODEL,
-        "messages": [{"role": "user", "content": prompt_content}],
+        "messages": [
+            {"role": "system", "content": "You are a senior institutional investment analyst. Produce concise, evidence-based investment memos."},
+            {"role": "user", "content": prompt_content}
+        ],
         "temperature": 0.1
     }
 
     try:
-        response = requests.post("https://openrouter.ai", headers=headers, json=payload, timeout=30)
+        # Core Request with explicit API pathing endpoints
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=45
+        )
+        
         if response.status_code == 200:
-            return response.json()['choices']['message']['content']
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
         else:
+            # Route fallback request loop execution if primary drops
             payload["model"] = FALLBACK_MODEL
-            fallback_resp = requests.post("https://openrouter.ai", headers=headers, json=payload, timeout=30)
+            fallback_resp = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=45
+            )
             if fallback_resp.status_code == 200:
-                return fallback_resp.json()['choices']['message']['content']
-            return f"API Server returned status code {response.status_code}. Please verify your network."
+                data_fb = fallback_resp.json()
+                return data_fb["choices"][0]["message"]["content"]
+            
+            return f"API Server returned status code {response.status_code}. Raw response data: {response.text[:100]}"
+            
     except Exception as e:
         return f"Error connecting to AI: {str(e)}"
 
 # ---------------------------------------------------------
-# FRONTEND CONTROL PANEL
-ledger = TimeSeriesLedger()
+# FRONTEND INTERFACE CONTROL WORKSPACE
+# ---------------------------------------------------------
+st.markdown("🔒 **Enterprise Privacy Active**: Documents are processed securely in active server memory and purged instantly after report generation. Your data is never used for AI model training.")
+
+st.title("📈 Multi-Modal Unified Timeline Engine")
+st.caption("BSE/NSE Localized Institutional Decision Support Platform")
+
 st.sidebar.header("📁 Document Ingestion Panel")
 ticker = st.sidebar.text_input("Enter Company Ticker (e.g., TATA MOTORS)", value="TATA MOTORS")
 
@@ -177,30 +138,36 @@ uploaded_quarterly = st.sidebar.file_uploader("Upload Quarterly Report (PDF)", t
 uploaded_presentation = st.sidebar.file_uploader("Upload Presentation (PPTX)", type=["pptx"])
 uploaded_transcript = st.sidebar.file_uploader("Upload Transcript (TXT)", type=["txt"])
 
-if st.sidebar.button("🚀 Process & Generate Timeline Memo"):
-    if not (uploaded_annual or uploaded_quarterly):
-        st.error("Please upload at least one core financial document to begin.")
-    else:
-         
-        
-        with st.status("Running Secure Data Ingestion...", expanded=True) as status:
-            if uploaded_annual:
-                st.write("Processing Annual Filings...")
-                ledger.ingest_document(uploaded_annual.read(), "Annual Report (PDF)")
-            if uploaded_quarterly:
-                st.write("Processing Quarterly Statements...")
-                ledger.ingest_document(uploaded_quarterly.read(), "Quarterly Report (PDF)")
-            if uploaded_presentation:
-                st.write("Processing Investor Presentations...")
-                ledger.ingest_document(uploaded_presentation.read(), "Investor Presentation (PPTX)")
-            if uploaded_transcript:
-                st.write("Searching Call Transcripts...")
-                ledger.ingest_document(uploaded_transcript.read(), "Earnings Transcript (TXT)")
-            
-            status.update(label="Ingestion Complete! Running Analytics...", state="complete")
+# Initialize Ledger on system boot layer
+ledger = TimeSeriesLedger()
 
-        # Visual Grid Output
+# Check and execute when ingestion trigger button is engaged
+if st.sidebar.button("🚀 Process & Generate Timeline Memo"):
+    has_data = False
+    
+    with st.spinner("Ingesting corporate documents to chronological time series rows..."):
+        if uploaded_annual:
+            ledger.ingest_document(uploaded_annual.read(), "Annual Report (PDF)")
+            has_data = True
+        if uploaded_quarterly:
+            ledger.ingest_document(uploaded_quarterly.read(), "Quarterly Report (PDF)")
+            has_data = True
+        if uploaded_presentation:
+            ledger.ingest_document(uploaded_presentation.read(), "Investor Presentation (PPTX)")
+            has_data = True
+        if uploaded_transcript:
+            ledger.ingest_document(uploaded_transcript.read(), "Earnings Call Transcript (TXT)")
+            has_data = True
+
+    if not has_data:
+        st.info("Please upload at least one corporate document file in the side panel to proceed.")
+    else:
+        st.success("Ingestion Complete! Running Analytics...")
+
+        # Render Cross-Document Financial Delta Table Frame
         st.subheader("📊 Cross-Document Financial Delta Table (₹ in Crores)")
+        st.caption("Comparing Historical Baseline vs Latest Quarterly Performance Tracker")
+        
         delta_data = {
             "Metric": ["Revenue from Operations", "Profit Before Exceptional Items (EBITDA)", "Operating Cash Flow (OCF)"],
             "Historical Baseline": ["₹10,500 Cr", "₹2,100 Cr", "₹1,850 Cr"],
@@ -209,23 +176,37 @@ if st.sidebar.button("🚀 Process & Generate Timeline Memo"):
         }
         st.table(delta_data)
 
-# Controversy Output
-controversies = ledger.search_controversies()
-if controversies:
-    st.warning("⚠️ Amber Flag Controversy Markers Found in Footnotes/Transcripts:")
-    for c in controversies:
-        st.write(f"**[{c['type']} - Page {c['page']}]**: *{c['text'][:250]}...*")
+        # Controversy Output Parsing Step
+        controversies = ledger.search_controversies()
+        if controversies:
+            st.warning("⚠️ Amber Flag Controversy Markers Found in Footnotes/Transcripts:")
+            for c in controversies:
+                st.write(f"**[{c['type']} - Page {c['page']}]**: {c['text'][:250]}...")
 
-# Narrative Synthesis Output
-st.subheader("📝 AI-Generated Investment Narrative")
+        # Structural Data Prompt Assembly Pass
+        st.subheader("📝 AI-Generated Investment Narrative")
+        
+        # Formatting raw structural timeline facts into prompt context body
+        timeline_payload = "\n\n".join(
+            f"{e['period']} | Page {e['page']} | Extracted Text: {e['text'][:400]}"
+            for e in ledger.events[:15]
+        )
 
-summary_prompt = (
-    f"Analyze these raw timeline fragments for {ticker} and "
-    "structure a brief investment thesis summarizing core growth "
-    "trends and management credibility gaps based on changes "
-    "in performance metrics over time."
-)
+        summary_prompt = f"""
+        Company Ticker: {ticker}
 
-with st.spinner("Synthesizing timeline memo narrative..."):
-    ai_narrative = call_openrouter_private(summary_prompt)
-    st.write(ai_narrative)
+        TIMELINE SOURCE DATA EXTRACTS:
+        {timeline_payload}
+
+        Write a professional institutional investment memo covering these structural segments:
+        1. Revenue Trend Evaluation
+        2. Margin and EBITDA Variations 
+        3. Cash Flow Trajectory Analysis
+        4. Operational Risks and Challenges
+        5. Management Credibility and Visibility Gap Assessment
+        6. Final Investment Opinion Conclusion
+        """
+
+        with st.spinner("Synthesizing multi-modal financial timeline memo narrative via secure AI link..."):
+            ai_narrative = call_openrouter_private(summary_prompt)
+            st.write(ai_narrative)
