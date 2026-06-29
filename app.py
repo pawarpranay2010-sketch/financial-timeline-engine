@@ -348,24 +348,24 @@ if submitted:
             "entry.1968966174": feedback_text
         }
 
-        try:
+                try:
             response = requests.post(
-                                     form_url,
-                                     data=payload,
-                                     timeout=10,
-                                     allow_redirects=False
-       )
+                form_url,
+                data=payload,
+                timeout=10,
+                allow_redirects=False
+            )
 
-           if response.status_code in [200, 302]:
-           st.success("🎉 Thank you! Your feedback has been submitted successfully.")
-           else:
+            if response.status_code in [200, 302]:
+                st.success("🎉 Thank you! Your feedback has been submitted successfully.")
+            else:
                 st.error(f"Submission failed ({response.status_code})")
 
-         except requests.exceptions.Timeout:
-         st.error("⚠️ Request timed out.")
+        except requests.exceptions.Timeout:
+            st.error("⚠️ Request timed out.")
 
-         except requests.exceptions.ConnectionError:
-         st.error("⚠️ Unable to connect to Google Forms.")
+        except requests.exceptions.ConnectionError:
+            st.error("⚠️ Unable to connect to Google Forms.")
 
-         except Exception as e:
-         st.error(f"⚠️ Unexpected Error: {e}")
+        except Exception as e:
+            st.error(f"⚠️ Unexpected Error: {str(e)}")
