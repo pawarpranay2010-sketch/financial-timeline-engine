@@ -11,9 +11,13 @@ import plotly.graph_objects as go
 from docx import Document
 from docx import Document as ReadDocument
 from duckduckgo_search import DDGS
+from streamlit_cookies_manager import CookieManager
 
 # Set Page Config immediately at the absolute top
 st.set_page_config(page_title="Multi-Modal Timeline Engine", layout="wide")
+
+# Initialize Cookie Manager for persistent authentication
+cookies = CookieManager()
 
 # Universal Model Configuration
 PRIMARY_MODEL = "openrouter/free"
@@ -516,10 +520,22 @@ INSTRUCTION: Answer the user query STRICTLY utilizing the provided document, met
                 st.write(insights)
 
 def check_login():
+    """
+    Persistent login with browser storage caching.
+    Checks browser cache first, then displays login form if needed.
+    """
+    # Check if authentication stamp exists in browser storage (cookie)
+    if "authenticated" in cookies and cookies["authenticated"] == "true":
+        st.session_state["authenticated"] = True
+        return True
+    
+    # Check session state as fallback
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
+    
     if not st.session_state["authenticated"]:
         st.markdown("<h2 style='text-align: center;'>🔐 Institutional Terminal Access</h2>", unsafe_allow_html=True)
+        st.caption("🟢 Your authentication will be cached in browser storage for seamless access on revisits.")
         col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
         with col_l2:
             input_user = st.text_input("Username")
@@ -527,6 +543,11 @@ def check_login():
             if st.button("🚀 Log In", use_container_width=True):
                 if input_user == "admin" and input_pass == "financial_terminal_2026":
                     st.session_state["authenticated"] = True
+                    # Write authentication stamp to browser storage (persistent cookie)
+                    cookies["authenticated"] = "true"
+                    cookies.save()
+                    st.success("✅ Authenticated! Credentials cached for future sessions.")
+                    time.sleep(1)
                     st.rerun()
                 else:
                     st.error("❌ Invalid Credentials")
