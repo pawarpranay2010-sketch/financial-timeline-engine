@@ -170,8 +170,7 @@ def main():
         st.warning("📥 Welcome! Please slide open the left sidebar drawer and upload your corporate financial tracking documents to activate processing modules.")
 
     # Single Authorized Global Form Render at base
-    render_feedback_panel()
-
+    
 if __name__ == "__main__":
     main()
     
