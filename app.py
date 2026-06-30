@@ -4,6 +4,7 @@
 import streamlit as st
 import requests
 import io
+import time
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
@@ -55,10 +56,10 @@ def extract_document_data(uploaded_file):
         return f"Error reading file text content: {str(e)}"
 
 # =========================================================
-# 3. SECURE AI THESIS ENGINE (WITH TIMEOUT RETRIES)
+# 3. SECURE AI THESIS ENGINE (WITH TIMEOUT RETRIES & AUTO-RETRY)
 # =========================================================
 def call_openrouter_engine(prompt_text):
-    """Sends financial data requests to OpenRouter securely with hard timeout retries."""
+    """Sends financial data requests to OpenRouter securely with hard timeout retries and automatic retry loop for rate limits."""
     api_key = st.secrets.get("OPENROUTER_API_KEY", "")
     if not api_key:
         return "❌ OpenRouter API Key missing inside Streamlit Secrets panel."
@@ -80,42 +81,79 @@ def call_openrouter_engine(prompt_text):
         ]
     }
     
+    max_retries = 3
+    retry_delay = 2  # seconds
+    
     # Pass 1: Try Primary Google Gemma Intelligence
-    try:
-        res = requests.post(endpoint, headers=headers, json=payload, timeout=45)
-        if res.status_code == 200:
-            try:
-                data = res.json()
-                if "choices" in data and len(data["choices"]) > 0:
-                    st.session_state["ai_connected"] = True
-                    return data["choices"][0]["message"]["content"]
+    for attempt in range(max_retries):
+        try:
+            res = requests.post(endpoint, headers=headers, json=payload, timeout=45)
+            if res.status_code == 200:
+                try:
+                    data = res.json()
+                    if "choices" in data and len(data["choices"]) > 0:
+                        st.session_state["ai_connected"] = True
+                        return data["choices"][0]["message"]["content"]
+                    else:
+                        return "⚠️ OpenRouter returned an empty choices payload. Please try clicking the button again."
+                except Exception:
+                    # Malformed JSON response - retry
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        return "⚠️ OpenRouter server returned a malformed response. The free pool is heavily congested right now. Please try again in 10 seconds!"
+            elif res.status_code == 429:
+                # Rate limit hit - retry with backoff
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    continue
                 else:
-                    return "⚠️ OpenRouter returned an empty choices payload. Please try clicking the button again."
-            except Exception:
-                return "⚠️ OpenRouter server returned a malformed response. The free pool is heavily congested right now. Please try again in 10 seconds!"
-        else:
-            return f"❌ OpenRouter Connection Failed. Server status code: {res.status_code}. Please retry."
-    except requests.exceptions.Timeout:
-        pass  # Gracefully fall through to retry block below
+                    return "⚠️ OpenRouter rate limit exceeded after 3 attempts. Please wait a moment and try again."
+            else:
+                return f"❌ OpenRouter Connection Failed. Server status code: {res.status_code}. Please retry."
+        except requests.exceptions.Timeout:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            else:
+                pass  # Fall through to Pass 2
 
     # Pass 2: Fallback to the Smart Router Net
-    try:
-        payload["model"] = FALLBACK_MODEL
-        res = requests.post(endpoint, headers=headers, json=payload, timeout=45)
-        if res.status_code == 200:
-            try:
-                data = res.json()
-                if "choices" in data and len(data["choices"]) > 0:
-                    st.session_state["ai_connected"] = True
-                    return data["choices"][0]["message"]["content"]
+    for attempt in range(max_retries):
+        try:
+            payload["model"] = FALLBACK_MODEL
+            res = requests.post(endpoint, headers=headers, json=payload, timeout=45)
+            if res.status_code == 200:
+                try:
+                    data = res.json()
+                    if "choices" in data and len(data["choices"]) > 0:
+                        st.session_state["ai_connected"] = True
+                        return data["choices"][0]["message"]["content"]
+                    else:
+                        return "⚠️ OpenRouter returned an empty choices payload. Please try clicking the button again."
+                except Exception:
+                    # Malformed JSON response - retry
+                    if attempt < max_retries - 1:
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        return "⚠️ OpenRouter server returned a malformed response. The free pool is heavily congested right now. Please try again in 10 seconds!"
+            elif res.status_code == 429:
+                # Rate limit hit - retry with backoff
+                if attempt < max_retries - 1:
+                    time.sleep(retry_delay)
+                    continue
                 else:
-                    return "⚠️ OpenRouter returned an empty choices payload. Please try clicking the button again."
-            except Exception:
-                return "⚠️ OpenRouter server returned a malformed response. The free pool is heavily congested right now. Please try again in 10 seconds!"
-        else:
-            return f"❌ OpenRouter Connection Failed. Server status code: {res.status_code}. Please retry."
-    except Exception:
-        return "🔴 AI server busy or experiencing high latency volume right now. Please tap regenerate to claim a fresh server slot link."
+                    return "⚠️ OpenRouter rate limit exceeded after 3 attempts. Please wait a moment and try again."
+            else:
+                return f"❌ OpenRouter Connection Failed. Server status code: {res.status_code}. Please retry."
+        except Exception:
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                continue
+            else:
+                return "🔴 AI server busy or experiencing high latency volume right now. Please tap regenerate to claim a fresh server slot link."
         
     return "⚠️ Primary AI endpoint returned an unusual response. Please check your token quota limit logs."
 
