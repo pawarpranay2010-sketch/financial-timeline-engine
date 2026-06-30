@@ -172,5 +172,6 @@ def main():
     # Single Authorized Global Form Render at base
     
 if __name__ == "__main__":
+    if check_login():    
     main()
     
