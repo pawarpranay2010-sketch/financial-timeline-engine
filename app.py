@@ -82,10 +82,17 @@ def call_openrouter_engine(prompt_text):
     try:
         res = requests.post(endpoint, headers=headers, json=payload, timeout=45)
         if res.status_code == 200:
-            data = res.json()
-            if "choices" in data and len(data["choices"]) > 0:
-                st.session_state["ai_connected"] = True
-                return data["choices"][0]["message"]["content"]
+            try:
+                data = res.json()
+                if "choices" in data and len(data["choices"]) > 0:
+                    st.session_state["ai_connected"] = True
+                    return data["choices"][0]["message"]["content"]
+                else:
+                    return "⚠️ OpenRouter returned an empty choices payload. Please try clicking the button again."
+            except Exception:
+                return "⚠️ OpenRouter server returned a malformed response. The free pool is heavily congested right now. Please try again in 10 seconds!"
+        else:
+            return f"❌ OpenRouter Connection Failed. Server status code: {res.status_code}. Please retry."
     except requests.exceptions.Timeout:
         pass  # Gracefully fall through to retry block below
 
@@ -94,10 +101,17 @@ def call_openrouter_engine(prompt_text):
         payload["model"] = FALLBACK_MODEL
         res = requests.post(endpoint, headers=headers, json=payload, timeout=45)
         if res.status_code == 200:
-            data = res.json()
-            if "choices" in data and len(data["choices"]) > 0:
-                st.session_state["ai_connected"] = True
-                return data["choices"][0]["message"]["content"]
+            try:
+                data = res.json()
+                if "choices" in data and len(data["choices"]) > 0:
+                    st.session_state["ai_connected"] = True
+                    return data["choices"][0]["message"]["content"]
+                else:
+                    return "⚠️ OpenRouter returned an empty choices payload. Please try clicking the button again."
+            except Exception:
+                return "⚠️ OpenRouter server returned a malformed response. The free pool is heavily congested right now. Please try again in 10 seconds!"
+        else:
+            return f"❌ OpenRouter Connection Failed. Server status code: {res.status_code}. Please retry."
     except Exception:
         return "🔴 AI server busy or experiencing high latency volume right now. Please tap regenerate to claim a fresh server slot link."
         
