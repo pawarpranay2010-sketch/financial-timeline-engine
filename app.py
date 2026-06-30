@@ -10,7 +10,7 @@ from docx import Document
 st.set_page_config(page_title="Multi-Modal Timeline Engine", layout="wide")
 
 # Universal Model Configuration
-PRIMARY_MODEL = "google/gemma-4-31b-it:free"
+PRIMARY_MODEL = "openrouter/free"
 FALLBACK_MODEL = "openrouter/free"
 
 # Initialize a session state tracking flag for actual AI connection success
