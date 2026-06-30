@@ -122,8 +122,9 @@ def render_feedback_panel():
             if not feedback_text.strip():
                 st.error("Please enter a message before submitting.")
             else:
-                form_url = "https://google.com
-                "
+                form_url = "https://docs.google.com/forms/d/e/1FAIpQLSdFxrYNNNm0VlJxL_4QLvQizcwZwm2CzP6hpyJm-Atfqh5gdQ/formResponse"
+                
+                
                 
                 payload = {
                     "entry.1762875148": user_email,    
