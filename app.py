@@ -4,7 +4,9 @@
 import streamlit as st
 import requests
 import io
+import pandas as pd
 from docx import Document
+from docx import Document as ReadDocument
 
 # Set Page Config immediately at the absolute top
 st.set_page_config(page_title="Multi-Modal Timeline Engine", layout="wide")
@@ -29,6 +31,21 @@ def extract_document_data(uploaded_file):
         filename = uploaded_file.name.lower()
         if filename.endswith(".txt") or filename.endswith(".csv"):
             return uploaded_file.read().decode("utf-8")
+        elif filename.endswith(".xlsx"):
+            # EXCEL PARSER
+            df_sheets = pd.read_excel(uploaded_file, sheet_name=None)
+            excel_text = ""
+            for sheet, df in df_sheets.items():
+                excel_text += f"\n--- Excel Sheet: {sheet} ---\n" + df.to_string() + "\n"
+            return excel_text
+        elif filename.endswith(".docx"):
+            # WORD PARSER
+            word_doc = ReadDocument(uploaded_file)
+            word_text = f"\n--- Word Document: {filename} ---\n"
+            for para in word_doc.paragraphs:
+                if para.text.strip():
+                    word_text += para.text + "\n"
+            return word_text
         else:
             # Fallback simple reader for byte streams (Ready for PDF/PPT libraries later)
             return uploaded_file.read().decode("utf-8", errors="ignore")
@@ -56,7 +73,7 @@ def call_openrouter_engine(prompt_text):
     payload = {
         "model": PRIMARY_MODEL,
         "messages": [
-            {"role": "system", "content": "You are an elite institutional financial research analyst. Generate detailed, multi-paragraph investment memos and market trend outlines based on raw text data."},
+            {"role": "system", "content": "You are an elite institutional financial research analyst. Generate detailed, multi-paragraph investment memos and market trend outlines based on raw tex[...]
             {"role": "user", "content": prompt_text}
         ]
     }
@@ -126,8 +143,8 @@ def main():
     # Sidebar Document Ingestion
     st.sidebar.header("📁 Document Ingestion Node")
     uploaded_files = st.sidebar.file_uploader(
-        "Upload Corporate Reports or Data Sheets (.txt, .csv)", 
-        type=["txt", "csv"], 
+        "Upload Corporate Reports or Data Sheets (.txt, .csv, .pdf, .xlsx, .docx)", 
+        type=["txt", "pdf", "csv", "xlsx", "docx"], 
         accept_multiple_files=True
     )
     
@@ -150,7 +167,7 @@ def main():
         st.subheader("🔬 AI Narrative Generation Engine")
         if st.button("🚀 Process & Generate Timeline Memo Narrative"):
             with st.spinner("Synthesizing multi-modal financial data timeline memo via OpenRouter link..."):
-                prompt = f"Analyze the following corporate document data text carefully. Extract key event milestones, timelines, and potential controversy flags. Write a comprehensive multi-paragraph investment memo:\n\n{combined_raw_text}"
+                prompt = f"Analyze the following corporate document data text carefully. Extract key event milestones, timelines, and potential controversy flags. Write a comprehensive multi-para[...]
                 ai_narrative_result = call_openrouter_engine(prompt)
                 
                 # Show AI Result
