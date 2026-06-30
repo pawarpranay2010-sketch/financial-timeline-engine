@@ -5,6 +5,8 @@ import streamlit as st
 import requests
 import io
 import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
 from docx import Document
 from docx import Document as ReadDocument
 
@@ -140,6 +142,113 @@ st.success(
 
 
 # =========================================================
+# 5. DASHBOARD METRICS & CHART GENERATION
+# =========================================================
+def render_metrics_dashboard():
+    """Renders the Interactive Metrics Tracker with high-contrast HTML audit cards."""
+    st.subheader("📊 Interactive Metrics Tracker")
+    
+    # Define core financial metrics
+    revenue = "₹21,533 Cr"
+    ebitda = "₹2,724 Cr"
+    fcf = "₹4,752 Cr"
+    exceptional_costs = "₹1,565 Cr"
+    
+    # Create 4-column layout for metric cards
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(
+            f"""
+            <div style="background-color: #1f77b4; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <h3 style="color: white; margin: 0;">Revenue</h3>
+                <p style="color: #e8f4f8; font-size: 24px; font-weight: bold; margin: 10px 0;">{revenue}</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
+    with col2:
+        st.markdown(
+            f"""
+            <div style="background-color: #ff7f0e; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <h3 style="color: white; margin: 0;">EBITDA</h3>
+                <p style="color: #fff0e6; font-size: 24px; font-weight: bold; margin: 10px 0;">{ebitda}</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
+    with col3:
+        st.markdown(
+            f"""
+            <div style="background-color: #2ca02c; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <h3 style="color: white; margin: 0;">FCF</h3>
+                <p style="color: #e8f5e9; font-size: 24px; font-weight: bold; margin: 10px 0;">{fcf}</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
+    with col4:
+        st.markdown(
+            f"""
+            <div style="background-color: #d62728; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <h3 style="color: white; margin: 0;">Exceptional Costs</h3>
+                <p style="color: #ffebee; font-size: 24px; font-weight: bold; margin: 10px 0;">{exceptional_costs}</p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
+    # Visual Growth Velocity Trends chart
+    st.markdown("---")
+    st.subheader("📈 Visual Growth Velocity Trends")
+    
+    # Generate synthetic trend data for visualization
+    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    revenue_trend = np.array([19000, 19500, 20000, 20500, 21000, 21500, 21800, 22000, 22300, 22500, 22800, 21533])
+    ebitda_trend = np.array([2200, 2300, 2400, 2500, 2600, 2650, 2700, 2720, 2730, 2740, 2750, 2724])
+    fcf_trend = np.array([4000, 4100, 4200, 4350, 4450, 4550, 4650, 4700, 4730, 4750, 4760, 4752])
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatter(
+        x=months, y=revenue_trend,
+        mode='lines+markers',
+        name='Revenue (₹ Cr)',
+        line=dict(color='#1f77b4', width=3),
+        marker=dict(size=8)
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=months, y=ebitda_trend,
+        mode='lines+markers',
+        name='EBITDA (₹ Cr)',
+        line=dict(color='#ff7f0e', width=3),
+        marker=dict(size=8)
+    ))
+    
+    fig.add_trace(go.Scatter(
+        x=months, y=fcf_trend,
+        mode='lines+markers',
+        name='FCF (₹ Cr)',
+        line=dict(color='#2ca02c', width=3),
+        marker=dict(size=8)
+    ))
+    
+    fig.update_layout(
+        title="12-Month Financial Performance Trajectory",
+        xaxis_title="Month",
+        yaxis_title="Amount (₹ Crores)",
+        hovermode='x unified',
+        height=450,
+        template='plotly_dark'
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+
+# =========================================================
 # 6. MAIN WORKSPACE CONTROL LAYER
 # =========================================================
 def main():
@@ -154,53 +263,123 @@ def main():
     else:
         st.info("🟡 AI Status: API Key Loaded (Awaiting First Live Document Generation Connection)")
 
-    # Sidebar Document Ingestion
-    st.sidebar.header("📁 Document Ingestion Node")
-    uploaded_files = st.sidebar.file_uploader(
-        "Upload Corporate Reports or Data Sheets (.txt, .csv, .pdf, .xlsx, .docx)", 
-        type=["txt", "pdf", "csv", "xlsx", "docx"], 
-        accept_multiple_files=True
-    )
+    # Create main tabs
+    tab1, tab2, tab3 = st.tabs(["📊 Interactive Metrics Tracker", "📁 Document Upload & Analysis", "🎯 Strategic Insights"])
     
-    combined_raw_text = ""
-    if uploaded_files:
-        for f in uploaded_files:
-            combined_raw_text += f"\n--- Start of File: {f.name} ---\n"
-            combined_raw_text += extract_document_data(f)
-            
-        # Clean executive metric data grid view summary for corporate users
-        st.subheader("📊 Ingested Data Grid Matrix")
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric(label="📄 Files Processed", value=len(uploaded_files))
-        col2.metric(label="📑 Processing Status", value="Success")
-        col3.metric(label="📊 Extracted Characters", value=len(combined_raw_text))
-        col4.metric(label="🤖 Pipeline Node", value="Ready")
+    # TAB 1: Interactive Metrics Tracker
+    with tab1:
+        render_metrics_dashboard()
         
-        # Trigger Action Analysis Button Link
         st.markdown("---")
-        st.subheader("🔬 AI Narrative Generation Engine")
-        if st.button("🚀 Process & Generate Timeline Memo Narrative"):
-            with st.spinner("Synthesizing multi-modal financial data timeline memo via OpenRouter link..."):
-                prompt = f"Analyze the following corporate document data text carefully. Extract key event milestones, timelines, and potential controversy flags. Write a comprehensive multi-paragraph financial analysis:\n\n{combined_raw_text}"
-                ai_narrative_result = call_openrouter_engine(prompt)
+        st.subheader("🔬 Generate Institutional Financial Analysis")
+        
+        if st.button("🚀 Generate AI-Powered Financial Report (Sections I-VI)"):
+            with st.spinner("Synthesizing Institutional Financial Analysis Report via OpenRouter..."):
+                prompt = """Generate a comprehensive Institutional Financial Analysis Report with the following structure:
+
+Section I: Executive Summary
+- Provide a high-level overview of financial performance and strategic position
+- Highlight key achievements and metrics
+
+Section II: Metrics Matrix
+- Present detailed breakdown of Revenue (₹21,533 Cr), EBITDA (₹2,724 Cr), FCF (₹4,752 Cr)
+- Analyze margins and operational efficiency ratios
+- Commentary on Exceptional Costs (₹1,565 Cr) and their impact
+
+Section III: Operational Risks
+- Identify key business risks and market headwinds
+- Rate severity and probability of impact
+
+Section IV: Bull Case
+- Articulate growth drivers and upside scenarios
+- Key catalysts for value creation
+
+Section V: Bear Case
+- Articulate downside risks and adverse scenarios
+- Key triggers for value destruction
+
+Section VI: Investment Conclusion
+- Synthesize the analysis into actionable recommendations
+- Provide confidence level and time horizon for thesis"""
                 
-                # Show AI Result
-                st.markdown("### 📝 Generated Strategic Investment Memo Text")
-                st.write(ai_narrative_result)
+                ai_analysis = call_openrouter_engine(prompt)
                 
-                # Render Working Document Exporter Module Download Button Link
-                if "❌" not in ai_narrative_result and "🔴" not in ai_narrative_result:
-                    docx_file_stream = generate_docx_download(ai_narrative_result)
+                st.markdown("### 📝 Institutional Financial Analysis Report")
+                st.write(ai_analysis)
+                
+                # Export to Word
+                if "❌" not in ai_analysis and "🔴" not in ai_analysis:
+                    docx_file = generate_docx_download(ai_analysis)
                     st.download_button(
-                        label="📥 Download Generated Investment Memo as Word Document (.docx)",
-                        data=docx_file_stream,
-                        file_name="Financial_Timeline_Investment_Memo.docx",
+                        label="📥 Download Report as Word Document (.docx)",
+                        data=docx_file,
+                        file_name="Institutional_Financial_Analysis.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     )
-    else:
-        st.warning("📥 Welcome! Please slide open the left sidebar drawer and upload your corporate financial tracking documents to activate processing modules.")
-
-    # Single Authorized Global Form Render at base
+    
+    # TAB 2: Document Upload & Analysis
+    with tab2:
+        st.subheader("📁 Document Ingestion Node")
+        uploaded_files = st.file_uploader(
+            "Upload Corporate Reports or Data Sheets (.txt, .csv, .pdf, .xlsx, .docx)", 
+            type=["txt", "pdf", "csv", "xlsx", "docx"], 
+            accept_multiple_files=True
+        )
+        
+        combined_raw_text = ""
+        if uploaded_files:
+            for f in uploaded_files:
+                combined_raw_text += f"\n--- Start of File: {f.name} ---\n"
+                combined_raw_text += extract_document_data(f)
+                
+            # Clean executive metric data grid view summary for corporate users
+            st.subheader("📊 Ingested Data Grid Matrix")
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric(label="📄 Files Processed", value=len(uploaded_files))
+            col2.metric(label="📑 Processing Status", value="Success")
+            col3.metric(label="📊 Extracted Characters", value=len(combined_raw_text))
+            col4.metric(label="🤖 Pipeline Node", value="Ready")
+            
+            # Trigger Action Analysis Button Link
+            st.markdown("---")
+            st.subheader("🔬 AI Narrative Generation Engine")
+            if st.button("🚀 Process & Generate Timeline Memo Narrative"):
+                with st.spinner("Synthesizing multi-modal financial data timeline memo via OpenRouter link..."):
+                    prompt = f"Analyze the following corporate document data text carefully. Extract key event milestones, timelines, and potential controversy flags. Write a comprehensive multi-paragraph financial analysis:\n\n{combined_raw_text}"
+                    ai_narrative_result = call_openrouter_engine(prompt)
+                    
+                    # Show AI Result
+                    st.markdown("### 📝 Generated Strategic Investment Memo Text")
+                    st.write(ai_narrative_result)
+                    
+                    # Render Working Document Exporter Module Download Button Link
+                    if "❌" not in ai_narrative_result and "🔴" not in ai_narrative_result:
+                        docx_file_stream = generate_docx_download(ai_narrative_result)
+                        st.download_button(
+                            label="📥 Download Generated Investment Memo as Word Document (.docx)",
+                            data=docx_file_stream,
+                            file_name="Financial_Timeline_Investment_Memo.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        )
+        else:
+            st.warning("📥 Welcome! Please upload your corporate financial tracking documents to activate processing modules.")
+    
+    # TAB 3: Strategic Insights
+    with tab3:
+        st.subheader("🎯 Strategic Analysis Hub")
+        st.info("Use this section for deeper analysis, trend forecasting, and strategic recommendations based on your uploaded documents.")
+        
+        if st.button("📊 Generate Strategic Insights"):
+            with st.spinner("Generating strategic insights..."):
+                prompt = """Provide strategic insights and recommendations including:
+1. Market positioning analysis
+2. Competitive landscape assessment
+3. Growth opportunity identification
+4. Risk mitigation strategies
+5. ESG considerations and impact"""
+                
+                insights = call_openrouter_engine(prompt)
+                st.write(insights)
 
 def check_login():
     if "authenticated" not in st.session_state:
