@@ -150,7 +150,7 @@ def main():
         st.subheader("🔬 AI Narrative Generation Engine")
         if st.button("🚀 Process & Generate Timeline Memo Narrative"):
             with st.spinner("Synthesizing multi-modal financial data timeline memo via OpenRouter link..."):
-                prompt = f"Analyze the following corporate document data text carefully. Extract key event milestones, timelines, and potential controversy flags. Write a comprehensive multi-paragraph financial research thesis memo:\n\n{combined_raw_text}"
+                prompt = f"Analyze the following corporate document data text carefully. Extract key event milestones, timelines, and potential controversy flags. Write a comprehensive multi-paragraph investment memo:\n\n{combined_raw_text}"
                 ai_narrative_result = call_openrouter_engine(prompt)
                 
                 # Show AI Result
@@ -170,8 +170,25 @@ def main():
         st.warning("📥 Welcome! Please slide open the left sidebar drawer and upload your corporate financial tracking documents to activate processing modules.")
 
     # Single Authorized Global Form Render at base
-    
+
+def check_login():
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+    if not st.session_state["authenticated"]:
+        st.markdown("<h2 style='text-align: center;'>🔐 Institutional Terminal Access</h2>", unsafe_allow_html=True)
+        col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
+        with col_l2:
+            input_user = st.text_input("Username")
+            input_pass = st.text_input("Password", type="password")
+            if st.button("🚀 Log In", use_container_width=True):
+                if input_user == "admin" and input_pass == "financial_terminal_2026":
+                    st.session_state["authenticated"] = True
+                    st.rerun()
+                else:
+                    st.error("❌ Invalid Credentials")
+        return False
+    return True
+
 if __name__ == "__main__":
-    if check_login():    
-    main()
-    
+    if check_login():
+        main()
