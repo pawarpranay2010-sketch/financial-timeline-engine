@@ -10,3 +10,4 @@ openpyxl
 scikit-learn
 fastapi
 uvicorn[standard]
+duckduckgo-search==6.1.7
