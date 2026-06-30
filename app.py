@@ -305,6 +305,10 @@ def render_metrics_dashboard():
 def main():
     st.title("📈 Multi-Modal Financial Timeline Engine")
     
+    # Initialize chat message history
+    if "chat_messages" not in st.session_state:
+        st.session_state["chat_messages"] = []
+    
     # Dynamic status tracker logic
     api_key_check = st.secrets.get("OPENROUTER_API_KEY", "")
     if not api_key_check:
@@ -429,6 +433,68 @@ Section VI: Investment Conclusion
                             file_name="Financial_Timeline_Investment_Memo.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         )
+            
+            # =========================================================
+            # INTERACTIVE DOCUMENT-AWARE CHAT INTERFACE
+            # =========================================================
+            st.markdown("---")
+            st.markdown("### 💬 Document-Aware Financial Assistant Chat")
+            st.caption("Ask specific follow-up questions. Responses are grounded strictly in your uploaded reports, metrics ledger, and web search data.")
+            
+            # Display chat message history
+            for msg in st.session_state["chat_messages"]:
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
+            
+            # Chat input box
+            user_input = st.chat_input("Ask a question about the uploaded corporate reports...")
+            
+            if user_input:
+                # Append user message to chat history
+                st.session_state["chat_messages"].append({
+                    "role": "user",
+                    "content": user_input
+                })
+                
+                # Display user message
+                with st.chat_message("user"):
+                    st.markdown(user_input)
+                
+                # Construct RAG prompt with document context, metrics, and web data
+                rag_context = f"""You are a document-aware financial research assistant. Answer the user's question STRICTLY utilizing ONLY the provided document context, core metrics, and web search results below.
+
+CORE FINANCIAL METRICS FRAMEWORK:
+- Revenue: ₹21,533 Cr
+- EBITDA: ₹2,724 Cr
+- FCF: ₹4,752 Cr
+- Exceptional Costs: ₹1,565 Cr
+
+DOCUMENT DATA:
+{combined_raw_text}
+
+WEB SEARCH CONTEXT:
+{web_context if web_context and "Web search engine busy" not in web_context else "No web search data available"}
+
+USER QUESTION: {user_input}
+
+INSTRUCTION: Answer the user query STRICTLY utilizing the provided document, metrics, and search context. If the answer cannot be found in the context, state that clearly and concisely. Do NOT fabricate information."""
+                
+                # Get AI response
+                with st.spinner("💭 Financial Assistant thinking..."):
+                    ai_response = call_openrouter_engine(rag_context)
+                
+                # Append assistant message to chat history
+                st.session_state["chat_messages"].append({
+                    "role": "assistant",
+                    "content": ai_response
+                })
+                
+                # Display assistant message
+                with st.chat_message("assistant"):
+                    st.markdown(ai_response)
+                
+                # Rerun to update chat display
+                st.rerun()
         else:
             st.warning("📥 Welcome! Please upload your corporate financial tracking documents to activate processing modules.")
     
