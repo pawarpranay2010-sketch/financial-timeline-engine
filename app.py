@@ -106,7 +106,7 @@ st.success(
     "📣 We actively improve this platform based on user feedback. "
     "[Submit feedback or feature requests here](https://google.com)"
 )
-(f"Failed to stream feedback to Google Sheets: {str(e)}")
+
 
 # =========================================================
 # 6. MAIN WORKSPACE CONTROL LAYER
