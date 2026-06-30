@@ -1,13 +1,8 @@
 streamlit==1.45.1
 pandas==2.2.3
 numpy==2.2.6
-plotly==6.1.2
 requests
-python-docx
 pypdf
-python-pptx
-openpyxl
-scikit-learn
-fastapi
-uvicorn[standard]
-duckduckgo-search==6.1.7
+python-docx
+duckduckgo-search
+
