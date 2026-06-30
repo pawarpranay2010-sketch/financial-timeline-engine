@@ -73,7 +73,7 @@ def call_openrouter_engine(prompt_text):
     payload = {
         "model": PRIMARY_MODEL,
         "messages": [
-            {"role": "system", "content": "You are an elite institutional financial research analyst. Generate detailed, multi-paragraph investment memos and market trend outlines based on raw tex[...]
+            {"role": "system", "content": "You are an elite Wall Street financial research analyst. Generate structured multi-section corporate reports."},
             {"role": "user", "content": prompt_text}
         ]
     }
@@ -167,7 +167,7 @@ def main():
         st.subheader("🔬 AI Narrative Generation Engine")
         if st.button("🚀 Process & Generate Timeline Memo Narrative"):
             with st.spinner("Synthesizing multi-modal financial data timeline memo via OpenRouter link..."):
-                prompt = f"Analyze the following corporate document data text carefully. Extract key event milestones, timelines, and potential controversy flags. Write a comprehensive multi-para[...]
+                prompt = f"Analyze the following corporate document data text carefully. Extract key event milestones, timelines, and potential controversy flags. Write a comprehensive multi-paragraph financial analysis:\n\n{combined_raw_text}"
                 ai_narrative_result = call_openrouter_engine(prompt)
                 
                 # Show AI Result
