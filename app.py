@@ -105,7 +105,7 @@ def generate_docx_download(text_content):
 # =========================================================
 # 5. USER APP FEEDBACK LOGGER (LIVE GOOGLE SHEETS WEBHOOK)
 # =========================================================
-def render_feedback_panel():
+ render_fdefeedback_panel():
     """Renders the single authorized feedback collector form at the base layout grid."""
     st.markdown("---")
     st.subheader("💬 Institutional User Feedback Panel")
@@ -127,20 +127,29 @@ def render_feedback_panel():
                 
                 
                 payload = {
-                    "entry.1762875148": user_email,    
-                    "entry.1554849047": feedback_type, 
-                    "entry.1968966174": feedback_text   
-                }
-                
+                           "entry.1762875148": user_email,
+                           "entry.1554849047": feedback_type,
+                           "entry.1968966174": feedback_text
+    }
+
                 try:
-                    response = requests.post(form_url, data=payload, timeout=10, allow_redirects=False)
-                    # FIXED: Correct list check syntax implemented
-                    if response.status_code in:
-                        st.success("🎉 Thank you! Your feedback has been saved directly to the Admin Google Sheet.")
-                    else:
-                        st.warning(f"Feedback sent, but server responded with status: {response.status_code}. We will review it shortly!")
-                except Exception as e:
-                    st.error(f"Failed to stream feedback to Google Sheets: {str(e)}")
+                    response = requests.post(
+                    form_url,
+                    data=payload,
+                    timeout=10,
+                    allow_redirects=False
+    )
+
+    # FIXED: Correct list check syntax implemented
+    if response.status_code in [200, 302]:
+       st.success("🎉 Thank you! Your feedback has been saved directly to the Admin Google Sheet.")
+    else:
+       st.warning(
+            f"Feedback sent, but server responded with status: {response.status_code}. We will review it shortly!"
+        )
+
+except Exception as e:
+       st.error(f"Failed to stream feedback to Google Sheets: {str(e)}")
 
 # =========================================================
 # 6. MAIN WORKSPACE CONTROL LAYER
