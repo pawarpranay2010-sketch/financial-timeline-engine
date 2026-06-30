@@ -10,6 +10,7 @@ import numpy as np
 import plotly.graph_objects as go
 from docx import Document
 from docx import Document as ReadDocument
+from duckduckgo_search import DDGS
 
 # Set Page Config immediately at the absolute top
 st.set_page_config(page_title="Multi-Modal Timeline Engine", layout="wide")
@@ -54,6 +55,18 @@ def extract_document_data(uploaded_file):
             return uploaded_file.read().decode("utf-8", errors="ignore")
     except Exception as e:
         return f"Error reading file text content: {str(e)}"
+
+# =========================================================
+# 2.5. LIVE WEB SEARCH ENGINE (DUCKDUCKGO)
+# =========================================================
+def search_live_web(query):
+    """Search the internet using DuckDuckGo for live financial context."""
+    try:
+        with DDGS() as ddgs:
+            results = [r['title'] + ": " + r['body'] for r in ddgs.text(query, max_results=3)]
+            return "\n\n".join(results)
+    except Exception:
+        return "⚠️ Web search engine busy. Relying strictly on uploaded document data."
 
 # =========================================================
 # 3. SECURE AI THESIS ENGINE (WITH TIMEOUT RETRIES & AUTO-RETRY)
@@ -364,11 +377,23 @@ Section VI: Investment Conclusion
             accept_multiple_files=True
         )
         
+        # Live Web Search Input
+        st.markdown("---")
+        web_query = st.text_input("🌐 Live Web Search Context (Optional)", placeholder="e.g., Tata Motors stock price today or competitors news...")
+        
         combined_raw_text = ""
+        web_context = ""
+        
         if uploaded_files:
             for f in uploaded_files:
                 combined_raw_text += f"\n--- Start of File: {f.name} ---\n"
                 combined_raw_text += extract_document_data(f)
+            
+            # If user provided a web search query, fetch live context
+            if web_query.strip():
+                with st.spinner("🌐 Fetching live web context..."):
+                    web_context = search_live_web(web_query)
+                    st.success("✅ Live web search completed!")
                 
             # Clean executive metric data grid view summary for corporate users
             st.subheader("📊 Ingested Data Grid Matrix")
@@ -383,7 +408,12 @@ Section VI: Investment Conclusion
             st.subheader("🔬 AI Narrative Generation Engine")
             if st.button("🚀 Process & Generate Timeline Memo Narrative"):
                 with st.spinner("Synthesizing multi-modal financial data timeline memo via OpenRouter link..."):
-                    prompt = f"Analyze the following corporate document data text carefully. Extract key event milestones, timelines, and potential controversy flags. Write a comprehensive multi-paragraph financial analysis:\n\n{combined_raw_text}"
+                    # Combine document data with live web context
+                    combined_context = combined_raw_text
+                    if web_context and "Web search engine busy" not in web_context:
+                        combined_context += f"\n\n--- LIVE WEB SEARCH RESULTS ---\n{web_context}\n--- END WEB SEARCH ---\n"
+                    
+                    prompt = f"Analyze the following corporate document data and live web search results carefully. Extract key event milestones, timelines, market context, and potential controversy flags. Write a comprehensive multi-paragraph financial analysis incorporating both the uploaded documents and current market information:\n\n{combined_context}"
                     ai_narrative_result = call_openrouter_engine(prompt)
                     
                     # Show AI Result
