@@ -4,31 +4,42 @@
 import streamlit as st
 import requests
 import io
-import time
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
 from docx import Document
-from docx import Document as ReadDocument
-from duckduckgo_search import DDGS
-from streamlit_cookies_manager import CookieManager
+import time
 
 # Set Page Config immediately at the absolute top
 st.set_page_config(page_title="Multi-Modal Timeline Engine", layout="wide")
 
-# Initialize Cookie Manager for persistent authentication
-cookies = CookieManager()
-
 # Universal Model Configuration
-PRIMARY_MODEL = "openrouter/free"
-FALLBACK_MODEL = "openrouter/free"
+PRIMARY_MODEL = "gemini-2.5-flash"
+BACKUP_MODEL_1 = "openrouter/free"
+BACKUP_MODEL_2 = "llama3-8b-8192"
 
 # Initialize a session state tracking flag for actual AI connection success
 if "ai_connected" not in st.session_state:
     st.session_state["ai_connected"] = False
 
+if "provider_used" not in st.session_state:
+    st.session_state["provider_used"] = "None"
+
 # =========================================================
-# 2. FILE EXTRACTION LAYER (CACHED DATA MODULE)
+# 2. PERSISTENT AUTHENTICATION LAYER
+# =========================================================
+def get_persistent_auth():
+    """Retrieve authentication state from browser URL parameters (persistent)."""
+    return st.query_params.get("auth_token") == "financial_terminal_2026_verified"
+
+def set_persistent_auth():
+    """Set authentication state in browser URL parameters (persistent)."""
+    st.query_params["auth_token"] = "financial_terminal_2026_verified"
+
+def clear_persistent_auth():
+    """Clear authentication state from browser URL parameters."""
+    if "auth_token" in st.query_params:
+        del st.query_params["auth_token"]
+
+# =========================================================
+# 3. FILE EXTRACTION LAYER (CACHED DATA MODULE)
 # =========================================================
 @st.cache_data(show_spinner=False)
 def extract_document_data(uploaded_file):
@@ -39,21 +50,6 @@ def extract_document_data(uploaded_file):
         filename = uploaded_file.name.lower()
         if filename.endswith(".txt") or filename.endswith(".csv"):
             return uploaded_file.read().decode("utf-8")
-        elif filename.endswith(".xlsx"):
-            # EXCEL PARSER
-            df_sheets = pd.read_excel(uploaded_file, sheet_name=None)
-            excel_text = ""
-            for sheet, df in df_sheets.items():
-                excel_text += f"\n--- Excel Sheet: {sheet} ---\n" + df.to_string() + "\n"
-            return excel_text
-        elif filename.endswith(".docx"):
-            # WORD PARSER
-            word_doc = ReadDocument(uploaded_file)
-            word_text = f"\n--- Word Document: {filename} ---\n"
-            for para in word_doc.paragraphs:
-                if para.text.strip():
-                    word_text += para.text + "\n"
-            return word_text
         else:
             # Fallback simple reader for byte streams (Ready for PDF/PPT libraries later)
             return uploaded_file.read().decode("utf-8", errors="ignore")
@@ -61,27 +57,47 @@ def extract_document_data(uploaded_file):
         return f"Error reading file text content: {str(e)}"
 
 # =========================================================
-# 2.5. LIVE WEB SEARCH ENGINE (DUCKDUCKGO)
+# 4. GOOGLE AI STUDIO ENGINE (PRIMARY PROVIDER)
 # =========================================================
-def search_live_web(query):
-    """Search the internet using DuckDuckGo for live financial context."""
+def call_google_ai_studio(prompt_text):
+    """Sends financial data requests to Google AI Studio via SDK with precise error handling."""
+    api_key = st.secrets.get("GOOGLE_API_KEY", "")
+    if not api_key:
+        return None, "❌ Google API Key missing from Streamlit Secrets panel."
+    
     try:
-        with DDGS() as ddgs:
-            results = [r['title'] + ": " + r['body'] for r in ddgs.text(query, max_results=3)]
-            return "\n\n".join(results)
-    except Exception:
-        return "⚠️ Web search engine busy. Relying strictly on uploaded document data."
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(PRIMARY_MODEL)
+        
+        # System context
+        system_prompt = "You are an elite institutional financial research analyst. Generate detailed, multi-paragraph investment memos and market trend outlines based on raw text analysis."
+        full_prompt = f"{system_prompt}\n\nAnalyze the following corporate document data: {prompt_text}"
+        
+        response = model.generate_content(full_prompt, request_options={"timeout": 45})
+        
+        if response and response.text:
+            st.session_state["ai_connected"] = True
+            st.session_state["provider_used"] = "Google AI Studio"
+            return response.text, "🟢 Generated via Google AI Studio"
+        else:
+            return None, "Google AI Studio returned empty content."
+    
+    except requests.exceptions.Timeout:
+        return None, "Google AI Studio request timed out (45s)."
+    except Exception as e:
+        return None, f"Google AI Studio error: {str(e)}"
 
 # =========================================================
-# 3. SECURE AI THESIS ENGINE (WITH TIMEOUT RETRIES & AUTO-RETRY)
+# 5. OPENROUTER ENGINE (BACKUP PROVIDER 1 - 3-RETRY CIRCUIT)
 # =========================================================
 def call_openrouter_engine(prompt_text):
-    """Sends financial data requests to OpenRouter securely with hard timeout retries and automatic retry loop for rate limits."""
+    """Sends financial data requests to OpenRouter securely with hard timeout retries."""
     api_key = st.secrets.get("OPENROUTER_API_KEY", "")
     if not api_key:
-        return "❌ OpenRouter API Key missing inside Streamlit Secrets panel."
+        return None, "❌ OpenRouter API Key missing from Streamlit Secrets panel."
         
-    endpoint = "https://openrouter.ai"
+    endpoint = "https://openrouter.ai/api/v1/chat/completions"
     
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -91,91 +107,144 @@ def call_openrouter_engine(prompt_text):
     }
     
     payload = {
-        "model": PRIMARY_MODEL,
+        "model": BACKUP_MODEL_1,
         "messages": [
-            {"role": "system", "content": "You are an elite Wall Street financial research analyst. Generate structured multi-section corporate reports."},
+            {"role": "system", "content": "You are an elite institutional financial research analyst. Generate detailed, multi-paragraph investment memos and market trend outlines based on raw text analysis."},
             {"role": "user", "content": prompt_text}
         ]
     }
     
-    max_retries = 3
-    retry_delay = 2  # seconds
-    
-    # Pass 1: Try Primary Google Gemma Intelligence
-    for attempt in range(max_retries):
-        try:
-            res = requests.post(endpoint, headers=headers, json=payload, timeout=45)
-            if res.status_code == 200:
-                try:
-                    data = res.json()
-                    if "choices" in data and len(data["choices"]) > 0:
-                        st.session_state["ai_connected"] = True
-                        return data["choices"][0]["message"]["content"]
-                    else:
-                        return "⚠️ OpenRouter returned an empty choices payload. Please try clicking the button again."
-                except Exception:
-                    # Malformed JSON response - retry
-                    if attempt < max_retries - 1:
-                        time.sleep(retry_delay)
-                        continue
-                    else:
-                        return "⚠️ OpenRouter server returned a malformed response. The free pool is heavily congested right now. Please try again in 10 seconds!"
-            elif res.status_code == 429:
-                # Rate limit hit - retry with backoff
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
-                    continue
-                else:
-                    return "⚠️ OpenRouter rate limit exceeded after 3 attempts. Please wait a moment and try again."
-            else:
-                return f"❌ OpenRouter Connection Failed. Server status code: {res.status_code}. Please retry."
-        except requests.exceptions.Timeout:
-            if attempt < max_retries - 1:
-                time.sleep(retry_delay)
-                continue
-            else:
-                pass  # Fall through to Pass 2
+    # Pass 1: Try Primary OpenRouter Model
+    try:
+        res = requests.post(endpoint, headers=headers, json=payload, timeout=45)
+        if res.status_code == 200:
+            data = res.json()
+            if "choices" in data and len(data["choices"]) > 0:
+                content = data["choices"][0]["message"]["content"]
+                if content and content.strip():
+                    st.session_state["ai_connected"] = True
+                    st.session_state["provider_used"] = "OpenRouter"
+                    return content, "🟢 Generated via OpenRouter"
+        elif res.status_code in [429, 502, 503, 504]:
+            # Rate limit or server busy - trigger fallback
+            return None, f"OpenRouter returned HTTP {res.status_code} (rate limit/server busy)."
+    except requests.exceptions.Timeout:
+        return None, "OpenRouter request timed out (45s)."
+    except requests.exceptions.ConnectionError:
+        return None, "OpenRouter connection error."
+    except Exception:
+        pass  # Gracefully fall through to Pass 2
 
-    # Pass 2: Fallback to the Smart Router Net
-    for attempt in range(max_retries):
-        try:
-            payload["model"] = FALLBACK_MODEL
-            res = requests.post(endpoint, headers=headers, json=payload, timeout=45)
-            if res.status_code == 200:
-                try:
-                    data = res.json()
-                    if "choices" in data and len(data["choices"]) > 0:
-                        st.session_state["ai_connected"] = True
-                        return data["choices"][0]["message"]["content"]
-                    else:
-                        return "⚠️ OpenRouter returned an empty choices payload. Please try clicking the button again."
-                except Exception:
-                    # Malformed JSON response - retry
-                    if attempt < max_retries - 1:
-                        time.sleep(retry_delay)
-                        continue
-                    else:
-                        return "⚠️ OpenRouter server returned a malformed response. The free pool is heavily congested right now. Please try again in 10 seconds!"
-            elif res.status_code == 429:
-                # Rate limit hit - retry with backoff
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
-                    continue
-                else:
-                    return "⚠️ OpenRouter rate limit exceeded after 3 attempts. Please wait a moment and try again."
-            else:
-                return f"❌ OpenRouter Connection Failed. Server status code: {res.status_code}. Please retry."
-        except Exception:
-            if attempt < max_retries - 1:
-                time.sleep(retry_delay)
-                continue
-            else:
-                return "🔴 AI server busy or experiencing high latency volume right now. Please tap regenerate to claim a fresh server slot link."
-        
-    return "⚠️ Primary AI endpoint returned an unusual response. Please check your token quota limit logs."
+    # Pass 2: Fallback to Alternative Router Net with 2-second backoff
+    try:
+        time.sleep(2)
+        res = requests.post(endpoint, headers=headers, json=payload, timeout=45)
+        if res.status_code == 200:
+            data = res.json()
+            if "choices" in data and len(data["choices"]) > 0:
+                content = data["choices"][0]["message"]["content"]
+                if content and content.strip():
+                    st.session_state["ai_connected"] = True
+                    st.session_state["provider_used"] = "OpenRouter"
+                    return content, "🟢 Generated via OpenRouter (Retry)"
+        elif res.status_code in [429, 502, 503, 504]:
+            return None, f"OpenRouter retry returned HTTP {res.status_code}."
+    except Exception:
+        pass  # Fall through to Pass 3
+
+    # Pass 3: Final Attempt with 4-second backoff
+    try:
+        time.sleep(4)
+        res = requests.post(endpoint, headers=headers, json=payload, timeout=45)
+        if res.status_code == 200:
+            data = res.json()
+            if "choices" in data and len(data["choices"]) > 0:
+                content = data["choices"][0]["message"]["content"]
+                if content and content.strip():
+                    st.session_state["ai_connected"] = True
+                    st.session_state["provider_used"] = "OpenRouter"
+                    return content, "🟢 Generated via OpenRouter (Final Attempt)"
+    except Exception:
+        pass
+
+    return None, "🔴 OpenRouter failed after 3 retry attempts."
 
 # =========================================================
-# 4. MICRO-UTILITY DOCUMENT EXPORTER (.DOCX EXPORTER)
+# 6. GROQ ENGINE (BACKUP PROVIDER 2)
+# =========================================================
+def call_groq_engine(prompt_text):
+    """Sends financial data requests to Groq with precise error handling."""
+    api_key = st.secrets.get("GROQ_API_KEY", "")
+    if not api_key:
+        return None, "❌ Groq API Key missing from Streamlit Secrets panel."
+    
+    endpoint = "https://api.groq.com/openai/v1/chat/completions"
+    
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    payload = {
+        "model": BACKUP_MODEL_2,
+        "messages": [
+            {"role": "system", "content": "You are an elite institutional financial research analyst. Generate detailed, multi-paragraph investment memos and market trend outlines based on raw text analysis."},
+            {"role": "user", "content": prompt_text}
+        ]
+    }
+    
+    try:
+        res = requests.post(endpoint, headers=headers, json=payload, timeout=45)
+        
+        if res.status_code == 200:
+            data = res.json()
+            if "choices" in data and len(data["choices"]) > 0:
+                content = data["choices"][0]["message"]["content"]
+                if content and content.strip():
+                    st.session_state["ai_connected"] = True
+                    st.session_state["provider_used"] = "Groq"
+                    return content, "🟢 Generated via Groq"
+            return None, "Groq returned empty content."
+        elif res.status_code in [429, 502, 503, 504]:
+            return None, f"Groq returned HTTP {res.status_code} (rate limit/server busy)."
+        else:
+            return None, f"Groq returned HTTP {res.status_code}."
+    
+    except requests.exceptions.Timeout:
+        return None, "Groq request timed out (45s)."
+    except requests.exceptions.ConnectionError:
+        return None, "Groq connection error."
+    except Exception as e:
+        return None, f"Groq error: {str(e)}"
+
+# =========================================================
+# 7. TRIPLE-PROVIDER FALLBACK ORCHESTRATOR
+# =========================================================
+def call_ai_triple_fallback(prompt_text):
+    """
+    Orchestrates provider fallback: Google AI Studio → OpenRouter → Groq
+    Returns (content, provider_status_message)
+    """
+    # Primary Provider: Google AI Studio
+    content, status = call_google_ai_studio(prompt_text)
+    if content:
+        return content, status
+    
+    # Backup Provider 1: OpenRouter (with 3-retry circuit intact)
+    content, status = call_openrouter_engine(prompt_text)
+    if content:
+        return content, status
+    
+    # Backup Provider 2: Groq
+    content, status = call_groq_engine(prompt_text)
+    if content:
+        return content, status
+    
+    # All providers failed
+    return None, "🔴 All AI providers exhausted. Please check your API keys and try again later."
+
+# =========================================================
+# 8. MICRO-UTILITY DOCUMENT EXPORTER (.DOCX EXPORTER)
 # =========================================================
 def generate_docx_download(text_content):
     """Compiles the generated AI analysis report into a clean Word document download stream."""
@@ -197,345 +266,89 @@ st.success(
 
 
 # =========================================================
-# 5. DASHBOARD METRICS & CHART GENERATION
-# =========================================================
-def render_metrics_dashboard():
-    """Renders the Interactive Metrics Tracker with high-contrast HTML audit cards."""
-    st.subheader("📊 Interactive Metrics Tracker")
-    
-    # Define core financial metrics
-    revenue = "₹21,533 Cr"
-    ebitda = "₹2,724 Cr"
-    fcf = "₹4,752 Cr"
-    exceptional_costs = "₹1,565 Cr"
-    
-    # Create 4-column layout for metric cards
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown(
-            f"""
-            <div style="background-color: #1f77b4; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                <h3 style="color: white; margin: 0;">Revenue</h3>
-                <p style="color: #e8f4f8; font-size: 24px; font-weight: bold; margin: 10px 0;">{revenue}</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    
-    with col2:
-        st.markdown(
-            f"""
-            <div style="background-color: #ff7f0e; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                <h3 style="color: white; margin: 0;">EBITDA</h3>
-                <p style="color: #fff0e6; font-size: 24px; font-weight: bold; margin: 10px 0;">{ebitda}</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    
-    with col3:
-        st.markdown(
-            f"""
-            <div style="background-color: #2ca02c; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                <h3 style="color: white; margin: 0;">FCF</h3>
-                <p style="color: #e8f5e9; font-size: 24px; font-weight: bold; margin: 10px 0;">{fcf}</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    
-    with col4:
-        st.markdown(
-            f"""
-            <div style="background-color: #d62728; padding: 20px; border-radius: 8px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-                <h3 style="color: white; margin: 0;">Exceptional Costs</h3>
-                <p style="color: #ffebee; font-size: 24px; font-weight: bold; margin: 10px 0;">{exceptional_costs}</p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-    
-    # Visual Growth Velocity Trends chart
-    st.markdown("---")
-    st.subheader("📈 Visual Growth Velocity Trends")
-    
-    # Generate synthetic trend data for visualization
-    months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    revenue_trend = np.array([19000, 19500, 20000, 20500, 21000, 21500, 21800, 22000, 22300, 22500, 22800, 21533])
-    ebitda_trend = np.array([2200, 2300, 2400, 2500, 2600, 2650, 2700, 2720, 2730, 2740, 2750, 2724])
-    fcf_trend = np.array([4000, 4100, 4200, 4350, 4450, 4550, 4650, 4700, 4730, 4750, 4760, 4752])
-    
-    fig = go.Figure()
-    
-    fig.add_trace(go.Scatter(
-        x=months, y=revenue_trend,
-        mode='lines+markers',
-        name='Revenue (₹ Cr)',
-        line=dict(color='#1f77b4', width=3),
-        marker=dict(size=8)
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=months, y=ebitda_trend,
-        mode='lines+markers',
-        name='EBITDA (₹ Cr)',
-        line=dict(color='#ff7f0e', width=3),
-        marker=dict(size=8)
-    ))
-    
-    fig.add_trace(go.Scatter(
-        x=months, y=fcf_trend,
-        mode='lines+markers',
-        name='FCF (₹ Cr)',
-        line=dict(color='#2ca02c', width=3),
-        marker=dict(size=8)
-    ))
-    
-    fig.update_layout(
-        title="12-Month Financial Performance Trajectory",
-        xaxis_title="Month",
-        yaxis_title="Amount (₹ Crores)",
-        hovermode='x unified',
-        height=450,
-        template='plotly_dark'
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-
-# =========================================================
-# 6. MAIN WORKSPACE CONTROL LAYER
+# 9. MAIN WORKSPACE CONTROL LAYER
 # =========================================================
 def main():
     st.title("📈 Multi-Modal Financial Timeline Engine")
     
-    # Initialize chat message history
-    if "chat_messages" not in st.session_state:
-        st.session_state["chat_messages"] = []
-    
     # Dynamic status tracker logic
-    api_key_check = st.secrets.get("OPENROUTER_API_KEY", "")
-    if not api_key_check:
-        st.error("🔴 AI Status: Offline (Missing OpenRouter Secrets Key Mapping)")
+    google_key_check = st.secrets.get("GOOGLE_API_KEY", "")
+    openrouter_key_check = st.secrets.get("OPENROUTER_API_KEY", "")
+    groq_key_check = st.secrets.get("GROQ_API_KEY", "")
+    
+    providers_available = sum([bool(google_key_check), bool(openrouter_key_check), bool(groq_key_check)])
+    
+    if providers_available == 0:
+        st.error("🔴 AI Status: Offline (No API Keys Configured)")
     elif st.session_state["ai_connected"]:
-        st.success("🟢 AI Status: Connected & Verified Live")
+        st.success(f"🟢 AI Status: Connected & Verified Live (Provider: {st.session_state['provider_used']})")
     else:
-        st.info("🟡 AI Status: API Key Loaded (Awaiting First Live Document Generation Connection)")
+        st.info(f"🟡 AI Status: {providers_available} Provider(s) Ready (Awaiting First Live Document Generation Connection)")
 
-    # Create main tabs
-    tab1, tab2, tab3 = st.tabs(["📊 Interactive Metrics Tracker", "📁 Document Upload & Analysis", "🎯 Strategic Insights"])
+    # Sidebar Document Ingestion
+    st.sidebar.header("📁 Document Ingestion Node")
+    uploaded_files = st.sidebar.file_uploader(
+        "Upload Corporate Reports or Data Sheets (.txt, .csv)", 
+        type=["txt", "csv"], 
+        accept_multiple_files=True
+    )
     
-    # TAB 1: Interactive Metrics Tracker
-    with tab1:
-        render_metrics_dashboard()
-        
-        st.markdown("---")
-        st.subheader("🔬 Generate Institutional Financial Analysis")
-        
-        if st.button("🚀 Generate AI-Powered Financial Report (Sections I-VI)"):
-            with st.spinner("Synthesizing Institutional Financial Analysis Report via OpenRouter..."):
-                prompt = """Generate a comprehensive Institutional Financial Analysis Report with the following structure:
-
-Section I: Executive Summary
-- Provide a high-level overview of financial performance and strategic position
-- Highlight key achievements and metrics
-
-Section II: Metrics Matrix
-- Present detailed breakdown of Revenue (₹21,533 Cr), EBITDA (₹2,724 Cr), FCF (₹4,752 Cr)
-- Analyze margins and operational efficiency ratios
-- Commentary on Exceptional Costs (₹1,565 Cr) and their impact
-
-Section III: Operational Risks
-- Identify key business risks and market headwinds
-- Rate severity and probability of impact
-
-Section IV: Bull Case
-- Articulate growth drivers and upside scenarios
-- Key catalysts for value creation
-
-Section V: Bear Case
-- Articulate downside risks and adverse scenarios
-- Key triggers for value destruction
-
-Section VI: Investment Conclusion
-- Synthesize the analysis into actionable recommendations
-- Provide confidence level and time horizon for thesis"""
-                
-                ai_analysis = call_openrouter_engine(prompt)
-                
-                st.markdown("### 📝 Institutional Financial Analysis Report")
-                st.write(ai_analysis)
-                
-                # Export to Word
-                if "❌" not in ai_analysis and "🔴" not in ai_analysis:
-                    docx_file = generate_docx_download(ai_analysis)
-                    st.download_button(
-                        label="📥 Download Report as Word Document (.docx)",
-                        data=docx_file,
-                        file_name="Institutional_Financial_Analysis.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-    
-    # TAB 2: Document Upload & Analysis
-    with tab2:
-        st.subheader("📁 Document Ingestion Node")
-        uploaded_files = st.file_uploader(
-            "Upload Corporate Reports or Data Sheets (.txt, .csv, .pdf, .xlsx, .docx)", 
-            type=["txt", "pdf", "csv", "xlsx", "docx"], 
-            accept_multiple_files=True
-        )
-        
-        # Live Web Search Input
-        st.markdown("---")
-        web_query = st.text_input("🌐 Live Web Search Context (Optional)", placeholder="e.g., Tata Motors stock price today or competitors news...")
-        
-        combined_raw_text = ""
-        web_context = ""
-        
-        if uploaded_files:
-            for f in uploaded_files:
-                combined_raw_text += f"\n--- Start of File: {f.name} ---\n"
-                combined_raw_text += extract_document_data(f)
+    combined_raw_text = ""
+    if uploaded_files:
+        for f in uploaded_files:
+            combined_raw_text += f"\n--- Start of File: {f.name} ---\n"
+            combined_raw_text += extract_document_data(f)
             
-            # If user provided a web search query, fetch live context
-            if web_query.strip():
-                with st.spinner("🌐 Fetching live web context..."):
-                    web_context = search_live_web(web_query)
-                    st.success("✅ Live web search completed!")
+        # Clean executive metric data grid view summary for corporate users
+        st.subheader("📊 Ingested Data Grid Matrix")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric(label="📄 Files Processed", value=len(uploaded_files))
+        col2.metric(label="📑 Processing Status", value="Success")
+        col3.metric(label="📊 Extracted Characters", value=len(combined_raw_text))
+        col4.metric(label="🤖 Pipeline Node", value="Ready")
+        
+        # Trigger Action Analysis Button Link
+        st.markdown("---")
+        st.subheader("🔬 AI Narrative Generation Engine")
+        if st.button("🚀 Process & Generate Timeline Memo Narrative"):
+            with st.spinner("Synthesizing multi-modal financial data timeline memo via triple-provider fallback..."):
+                prompt = f"Analyze the following corporate document data text carefully. Extract key event milestones, timelines, and potential controversy flags. Write a comprehensive multi-paragraph investment memo with strategic recommendations:\n\n{combined_raw_text}"
+                ai_narrative_result, provider_status = call_ai_triple_fallback(prompt)
                 
-            # Clean executive metric data grid view summary for corporate users
-            st.subheader("📊 Ingested Data Grid Matrix")
-            col1, col2, col3, col4 = st.columns(4)
-            col1.metric(label="📄 Files Processed", value=len(uploaded_files))
-            col2.metric(label="📑 Processing Status", value="Success")
-            col3.metric(label="📊 Extracted Characters", value=len(combined_raw_text))
-            col4.metric(label="🤖 Pipeline Node", value="Ready")
-            
-            # Trigger Action Analysis Button Link
-            st.markdown("---")
-            st.subheader("🔬 AI Narrative Generation Engine")
-            if st.button("🚀 Process & Generate Timeline Memo Narrative"):
-                with st.spinner("Synthesizing multi-modal financial data timeline memo via OpenRouter link..."):
-                    # Combine document data with live web context
-                    combined_context = combined_raw_text
-                    if web_context and "Web search engine busy" not in web_context:
-                        combined_context += f"\n\n--- LIVE WEB SEARCH RESULTS ---\n{web_context}\n--- END WEB SEARCH ---\n"
-                    
-                    prompt = f"Analyze the following corporate document data and live web search results carefully. Extract key event milestones, timelines, market context, and potential controversy flags. Write a comprehensive multi-paragraph financial analysis incorporating both the uploaded documents and current market information:\n\n{combined_context}"
-                    ai_narrative_result = call_openrouter_engine(prompt)
-                    
+                if ai_narrative_result:
                     # Show AI Result
                     st.markdown("### 📝 Generated Strategic Investment Memo Text")
                     st.write(ai_narrative_result)
                     
+                    # Display Provider Status
+                    st.info(provider_status)
+                    
                     # Render Working Document Exporter Module Download Button Link
-                    if "❌" not in ai_narrative_result and "🔴" not in ai_narrative_result:
-                        docx_file_stream = generate_docx_download(ai_narrative_result)
-                        st.download_button(
-                            label="📥 Download Generated Investment Memo as Word Document (.docx)",
-                            data=docx_file_stream,
-                            file_name="Financial_Timeline_Investment_Memo.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        )
-            
-            # =========================================================
-            # INTERACTIVE DOCUMENT-AWARE CHAT INTERFACE
-            # =========================================================
-            st.markdown("---")
-            st.markdown("### 💬 Document-Aware Financial Assistant Chat")
-            st.caption("Ask specific follow-up questions. Responses are grounded strictly in your uploaded reports, metrics ledger, and web search data.")
-            
-            # Display chat message history
-            for msg in st.session_state["chat_messages"]:
-                with st.chat_message(msg["role"]):
-                    st.markdown(msg["content"])
-            
-            # Chat input box
-            user_input = st.chat_input("Ask a question about the uploaded corporate reports...")
-            
-            if user_input:
-                # Append user message to chat history
-                st.session_state["chat_messages"].append({
-                    "role": "user",
-                    "content": user_input
-                })
-                
-                # Display user message
-                with st.chat_message("user"):
-                    st.markdown(user_input)
-                
-                # Construct RAG prompt with document context, metrics, and web data
-                rag_context = f"""You are a document-aware financial research assistant. Answer the user's question STRICTLY utilizing ONLY the provided document context, core metrics, and web search results below.
+                    docx_file_stream = generate_docx_download(ai_narrative_result)
+                    st.download_button(
+                        label="📥 Download Generated Investment Memo as Word Document (.docx)",
+                        data=docx_file_stream,
+                        file_name="Financial_Timeline_Investment_Memo.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+                else:
+                    st.error(provider_status)
+    else:
+        st.warning("📥 Welcome! Please slide open the left sidebar drawer and upload your corporate financial tracking documents to activate processing modules.")
 
-CORE FINANCIAL METRICS FRAMEWORK:
-- Revenue: ₹21,533 Cr
-- EBITDA: ₹2,724 Cr
-- FCF: ₹4,752 Cr
-- Exceptional Costs: ₹1,565 Cr
-
-DOCUMENT DATA:
-{combined_raw_text}
-
-WEB SEARCH CONTEXT:
-{web_context if web_context and "Web search engine busy" not in web_context else "No web search data available"}
-
-USER QUESTION: {user_input}
-
-INSTRUCTION: Answer the user query STRICTLY utilizing the provided document, metrics, and search context. If the answer cannot be found in the context, state that clearly and concisely. Do NOT fabricate information."""
-                
-                # Get AI response
-                with st.spinner("💭 Financial Assistant thinking..."):
-                    ai_response = call_openrouter_engine(rag_context)
-                
-                # Append assistant message to chat history
-                st.session_state["chat_messages"].append({
-                    "role": "assistant",
-                    "content": ai_response
-                })
-                
-                # Display assistant message
-                with st.chat_message("assistant"):
-                    st.markdown(ai_response)
-                
-                # Rerun to update chat display
-                st.rerun()
-        else:
-            st.warning("📥 Welcome! Please upload your corporate financial tracking documents to activate processing modules.")
-    
-    # TAB 3: Strategic Insights
-    with tab3:
-        st.subheader("🎯 Strategic Analysis Hub")
-        st.info("Use this section for deeper analysis, trend forecasting, and strategic recommendations based on your uploaded documents.")
-        
-        if st.button("📊 Generate Strategic Insights"):
-            with st.spinner("Generating strategic insights..."):
-                prompt = """Provide strategic insights and recommendations including:
-1. Market positioning analysis
-2. Competitive landscape assessment
-3. Growth opportunity identification
-4. Risk mitigation strategies
-5. ESG considerations and impact"""
-                
-                insights = call_openrouter_engine(prompt)
-                st.write(insights)
+    # Single Authorized Global Form Render at base
 
 def check_login():
-    """
-    Persistent login with browser storage caching.
-    Checks browser cache first, then displays login form if needed.
-    """
-    # Check if authentication stamp exists in browser storage (cookie)
-    if "authenticated" in cookies and cookies["authenticated"] == "true":
+    # First check persistent authentication
+    if get_persistent_auth():
         st.session_state["authenticated"] = True
         return True
     
-    # Check session state as fallback
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
     
     if not st.session_state["authenticated"]:
         st.markdown("<h2 style='text-align: center;'>🔐 Institutional Terminal Access</h2>", unsafe_allow_html=True)
-        st.caption("🟢 Your authentication will be cached in browser storage for seamless access on revisits.")
         col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
         with col_l2:
             input_user = st.text_input("Username")
@@ -543,15 +356,22 @@ def check_login():
             if st.button("🚀 Log In", use_container_width=True):
                 if input_user == "admin" and input_pass == "financial_terminal_2026":
                     st.session_state["authenticated"] = True
-                    # Write authentication stamp to browser storage (persistent cookie)
-                    cookies["authenticated"] = "true"
-                    cookies.save()
-                    st.success("✅ Authenticated! Credentials cached for future sessions.")
-                    time.sleep(1)
+                    set_persistent_auth()
+                    st.success("✅ Authentication successful! Redirecting...")
                     st.rerun()
                 else:
                     st.error("❌ Invalid Credentials")
         return False
+    
+    # Authenticated user - show logout button in sidebar
+    with st.sidebar:
+        st.markdown("---")
+        if st.button("🔓 Log Out"):
+            st.session_state["authenticated"] = False
+            clear_persistent_auth()
+            st.success("✅ Logged out successfully!")
+            st.rerun()
+    
     return True
 
 if __name__ == "__main__":
