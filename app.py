@@ -73,7 +73,7 @@ def call_openrouter_engine(prompt_text):
         "model": PRIMARY_MODEL,
         "messages": [
             {"role": "system", "content": "You are an elite Wall Street financial research analyst. Generate structured multi-section corporate reports with key dates, events, and milestones."},
-            {"role": "user", "content": prompt_text}
+            {"role": "user", "content": str(prompt_text)}
         ]
     }
     
