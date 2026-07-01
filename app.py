@@ -174,15 +174,26 @@ Return ONLY valid JSON array, no markdown, no extra text."""
 # 4. MICRO-UTILITY DOCUMENT EXPORTER (.DOCX EXPORTER)
 # =========================================================
 def generate_docx_download(text_content, timeline_data=None):
-    """Compiles the generated AI analysis report into a clean Word document download stream."""
+    """Compiles the generated AI analysis report into a clean Word document download stream with sanitized line-by-line text."""
     doc = Document()
-    doc.add_heading("Institutional Investment Timeline Memo Narrative", level=1)
-    doc.add_paragraph("Generated via Multi-Modal Timeline Engine Platform Hub")
-    doc.add_paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    doc.add_paragraph("-" * 40)
     
-    doc.add_heading("Executive Summary", level=2)
-    doc.add_paragraph(text_content)
+    doc.add_heading("Institutional Investment Research Memo", level=1)
+    doc.add_paragraph("-" * 40)
+    doc.add_heading("Executive Summary & Analysis", level=2)
+    
+    # Secure row cleaning loop to bypass oxml crashes
+    if text_content:
+        clean_text_string = str(text_content)
+        for line in clean_text_string.split('\n'):
+            if line.strip():
+                # Strip out invalid control characters safely - keep only printable chars and tabs
+                sanitized_line = "".join(c for c in line if c.isprintable() or c in ['\t', '\n'])
+                # Remove markdown formatting symbols
+                sanitized_line = sanitized_line.replace('**', '').replace('__', '').replace('```', '')
+                if sanitized_line.strip():
+                    doc.add_paragraph(sanitized_line.strip())
+    else:
+        doc.add_paragraph("No report content generated.")
     
     # Add timeline section if data exists
     if timeline_data and len(timeline_data) > 0:
@@ -192,6 +203,12 @@ def generate_docx_download(text_content, timeline_data=None):
             event_name = event.get("event", "N/A")
             category = event.get("category", "N/A")
             impact = event.get("impact", "N/A")
+            
+            # Sanitize timeline event strings
+            date_str = "".join(c for c in str(date_str) if c.isprintable())
+            event_name = "".join(c for c in str(event_name) if c.isprintable())
+            category = "".join(c for c in str(category) if c.isprintable())
+            impact = "".join(c for c in str(impact) if c.isprintable())
             
             doc.add_paragraph(f"📅 {date_str}: {event_name}", style="List Bullet")
             doc.add_paragraph(f"Category: {category} | Impact: {impact}", style="List Bullet 2")
