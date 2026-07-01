@@ -7,3 +7,4 @@ python-docx
 duckduckgo-search
 plotly
 openpyxl
+streamlit-cookies-manager
