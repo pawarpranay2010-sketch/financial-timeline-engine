@@ -1,6 +1,4 @@
-# =========================================================
-# 1. IMPORTS & GLOBAL SETUP
-# =========================================================
+# App.py
 import streamlit as st
 import requests
 import io
@@ -10,24 +8,21 @@ from docx import Document as ReadDocument
 import json
 from datetime import datetime
 
-# Set Page Config immediately at the absolute top
-st.set_page_config(page_title="Multi-Modal Timeline Engine", layout="wide")
+# Set Page Config for mobile
+st.set_page_config(page_title="Financial Timeline Engine", layout="centered")
 
 # Universal Model Configuration
 PRIMARY_MODEL = "openrouter/free"
 FALLBACK_MODEL = "openrouter/free"
 
-# Initialize a session state tracking flag for actual AI connection success
+# Initialize session states
 if "ai_connected" not in st.session_state:
     st.session_state["ai_connected"] = False
 
-# Initialize extracted timeline data storage
 if "timeline_data" not in st.session_state:
     st.session_state["timeline_data"] = []
 
-# =========================================================
-# 2. FILE EXTRACTION LAYER (CACHED DATA MODULE)
-# =========================================================
+# File extraction layer
 @st.cache_data(show_spinner=False)
 def extract_document_data(uploaded_file):
     """Reads text lines from uploaded files safely."""
@@ -53,20 +48,18 @@ def extract_document_data(uploaded_file):
                     word_text += para.text + "\n"
             return word_text
         else:
-            # Fallback simple reader for byte streams (Ready for PDF/PPT libraries later)
+            # Fallback simple reader for byte streams
             return uploaded_file.read().decode("utf-8", errors="ignore")
     except Exception as e:
         return f"Error reading file text content: {str(e)}"
 
-# =========================================================
-# 3. SECURE AI THESIS ENGINE (WITH TIMEOUT RETRIES)
-# =========================================================
+# Secure AI thesis engine
 def call_openrouter_engine(prompt_text):
     """Sends financial data requests to OpenRouter securely with hard timeout retries."""
     api_key = st.secrets.get("OPENROUTER_API_KEY", "")
     if not api_key:
         return "❌ OpenRouter API Key missing inside Streamlit Secrets panel."
-        
+    
     endpoint = "https://openrouter.ai/api/v1/chat/completions"
     
     headers = {
@@ -100,7 +93,7 @@ def call_openrouter_engine(prompt_text):
         else:
             return f"❌ OpenRouter Connection Failed. Server status code: {res.status_code}. Please retry."
     except requests.exceptions.Timeout:
-        pass  # Gracefully fall through to retry block below
+        pass # Gracefully fall through to retry block below
 
     # Pass 2: Fallback to the Smart Router Net
     try:
@@ -120,12 +113,10 @@ def call_openrouter_engine(prompt_text):
             return f"❌ OpenRouter Connection Failed. Server status code: {res.status_code}. Please retry."
     except Exception:
         return "🔴 AI server busy or experiencing high latency volume right now. Please tap regenerate to claim a fresh server slot link."
-        
+    
     return "⚠️ Primary AI endpoint returned an unusual response. Please check your token quota limit logs."
 
-# =========================================================
-# 3.5 TIMELINE EXTRACTION & PARSING ENGINE
-# =========================================================
+# Timeline extraction & parsing engine
 def extract_timeline_events(ai_narrative):
     """Parses AI narrative to extract structured timeline events."""
     try:
@@ -170,11 +161,9 @@ Return ONLY valid JSON array, no markdown, no extra text."""
     except Exception:
         return []
 
-# =========================================================
-# 4. MICRO-UTILITY DOCUMENT EXPORTER (.DOCX EXPORTER)
-# =========================================================
+# Micro-utility document exporter (.DOCX exporter)
 def generate_docx_download(text_content, timeline_data=None):
-    """Compiles the generated AI analysis report into a clean Word document download stream with sanitized line-by-line text."""
+    """Compiles the generated AI analysis report into a clean Word document download stream."""
     doc = Document()
     
     doc.add_heading("Institutional Investment Research Memo", level=1)
@@ -186,14 +175,14 @@ def generate_docx_download(text_content, timeline_data=None):
         clean_text_string = str(text_content)
         for line in clean_text_string.split('\n'):
             if line.strip():
-                # Strip out invalid control characters safely - keep only printable chars and tabs
+                # Strip out invalid control characters safely
                 sanitized_line = "".join(c for c in line if c.isprintable() or c in ['\t', '\n'])
                 # Remove markdown formatting symbols
                 sanitized_line = sanitized_line.replace('**', '').replace('__', '').replace('```', '')
                 if sanitized_line.strip():
                     doc.add_paragraph(sanitized_line.strip())
-    else:
-        doc.add_paragraph("No report content generated.")
+        else:
+            doc.add_paragraph("No report content generated.")
     
     # Add timeline section if data exists
     if timeline_data and len(timeline_data) > 0:
@@ -218,46 +207,24 @@ def generate_docx_download(text_content, timeline_data=None):
     bio.seek(0)
     return bio
 
-st.success(
-    "📣 We actively improve this platform based on user feedback. "
-    "[Submit feedback or feature requests here](https://google.com)"
-)
-
-
-# =========================================================
-# 5. TIMELINE VISUALIZATION ENGINE
-# =========================================================
+# Timeline visualization engine
 def render_timeline_visualization(timeline_data):
-    """Renders an interactive timeline visualization."""
+    """Renders a simplified timeline visualization for mobile."""
     if not timeline_data or len(timeline_data) == 0:
         st.info("No timeline events extracted yet.")
         return
     
-    st.subheader("📊 Timeline Visualization")
+    st.subheader("📊 Timeline Events")
     
     # Create a dataframe for display
     df_timeline = pd.DataFrame(timeline_data)
     
     # Display as table
     st.dataframe(df_timeline, use_container_width=True, hide_index=True)
-    
-    # Create a simple timeline chart if we have dates
-    if "date" in df_timeline.columns:
-        try:
-            # Convert dates to datetime for sorting
-            df_timeline["date_obj"] = pd.to_datetime(df_timeline["date"], errors="coerce")
-            df_timeline_sorted = df_timeline.dropna(subset=["date_obj"]).sort_values("date_obj")
-            
-            if len(df_timeline_sorted) > 0:
-                st.line_chart(df_timeline_sorted.set_index("date")[["event"]].astype(str))
-        except:
-            pass
 
-# =========================================================
-# 6. MAIN WORKSPACE CONTROL LAYER
-# =========================================================
+# Main workspace control layer
 def main():
-    st.title("📈 Multi-Modal Financial Timeline Engine")
+    st.title("📈 Financial Timeline Engine")
     
     # Dynamic status tracker logic
     api_key_check = st.secrets.get("OPENROUTER_API_KEY", "")
@@ -267,12 +234,12 @@ def main():
         st.success("🟢 AI Status: Connected & Verified Live")
     else:
         st.info("🟡 AI Status: API Key Loaded (Awaiting First Live Document Generation Connection)")
-
+    
     # Sidebar Document Ingestion
-    st.sidebar.header("📁 Document Ingestion Node")
+    st.sidebar.header("📁 Document Ingestion")
     uploaded_files = st.sidebar.file_uploader(
-        "Upload Corporate Reports or Data Sheets (.txt, .csv, .pdf, .xlsx, .docx)", 
-        type=["txt", "pdf", "csv", "xlsx", "docx"], 
+        "Upload Financial Documents (.txt, .csv, .xlsx, .docx)", 
+        type=["txt", "csv", "xlsx", "docx"], 
         accept_multiple_files=True
     )
     
@@ -281,21 +248,20 @@ def main():
         for f in uploaded_files:
             combined_raw_text += f"\n--- Start of File: {f.name} ---\n"
             combined_raw_text += extract_document_data(f)
-            
-        # Clean executive metric data grid view summary for corporate users
-        st.subheader("📊 Ingested Data Grid Matrix")
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric(label="📄 Files Processed", value=len(uploaded_files))
-        col2.metric(label="📑 Processing Status", value="Success")
-        col3.metric(label="📊 Extracted Characters", value=len(combined_raw_text))
-        col4.metric(label="🤖 Pipeline Node", value="Ready")
-        
-        # Trigger Action Analysis Button Link
-        st.markdown("---")
-        st.subheader("🔬 AI Narrative Generation Engine")
-        if st.button("🚀 Process & Generate Timeline Memo Narrative"):
-            with st.spinner("Synthesizing multi-modal financial data timeline memo via OpenRouter link..."):
-                prompt = f"""Analyze the following corporate document data text carefully. Extract key event milestones, timelines, and potential controversy flags. Write a comprehensive multi-paragraph investment memo that identifies:
+    
+    # Clean executive metric data grid view summary
+    st.subheader("📊 Ingested Data Summary")
+    col1, col2 = st.columns(2)
+    col1.metric(label="📄 Files Processed", value=len(uploaded_files))
+    col2.metric(label="📊 Extracted Characters", value=len(combined_raw_text))
+    
+    # Trigger Action Analysis Button Link
+    st.markdown("---")
+    st.subheader("🔬 AI Analysis Engine")
+    
+    if st.button("🚀 Generate Timeline Report"):
+        with st.spinner("Processing document data and generating timeline..."):
+            prompt = f"""Analyze the following corporate document data text carefully. Extract key event milestones, timelines, and potential controversy flags. Write a comprehensive multi-paragraph investment memo that identifies:
 1. Key financial events and dates
 2. Market movements and impacts
 3. Risk factors and opportunities
@@ -305,38 +271,39 @@ Document Data:
 {combined_raw_text}
 
 Generate a professional investment memo."""
-                ai_narrative_result = call_openrouter_engine(prompt)
-                
-                # Show AI Result
-                st.markdown("### 📝 Generated Strategic Investment Memo Text")
-                st.write(ai_narrative_result)
-                
-                # Extract timeline events
-                with st.spinner("Extracting timeline events..."):
-                    timeline_events = extract_timeline_events(ai_narrative_result)
-                    st.session_state["timeline_data"] = timeline_events
-                
-                # Render timeline visualization
-                if timeline_events:
-                    render_timeline_visualization(timeline_events)
-                
-                # Render Working Document Exporter Module Download Button Link
-                if "❌" not in ai_narrative_result and "🔴" not in ai_narrative_result:
-                    docx_file_stream = generate_docx_download(ai_narrative_result, timeline_events)
-                    st.download_button(
-                        label="📥 Download Generated Investment Memo as Word Document (.docx)",
-                        data=docx_file_stream,
-                        file_name="Financial_Timeline_Investment_Memo.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-    else:
-        st.warning("📥 Welcome! Please slide open the left sidebar drawer and upload your corporate financial tracking documents to activate processing modules.")
+            
+            ai_narrative_result = call_openrouter_engine(prompt)
+            
+            # Show AI Result
+            st.markdown("### 📝 Generated Investment Memo")
+            st.write(ai_narrative_result)
+            
+            # Extract timeline events
+            with st.spinner("Extracting timeline events..."):
+                timeline_events = extract_timeline_events(ai_narrative_result)
+                st.session_state["timeline_data"] = timeline_events
+            
+            # Render timeline visualization
+            if timeline_events:
+                render_timeline_visualization(timeline_events)
+            
+            # Render Working Document Exporter Module Download Button Link
+            if "❌" not in ai_narrative_result and "🔴" not in ai_narrative_result:
+                docx_file_stream = generate_docx_download(ai_narrative_result, timeline_events)
+                st.download_button(
+                    label="📥 Download as Word Document",
+                    data=docx_file_stream,
+                    file_name="Financial_Timeline_Investment_Memo.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+            else:
+                st.warning("Please upload financial documents to generate a report.")
 
 def check_login():
     if "authenticated" not in st.session_state:
         st.session_state["authenticated"] = False
     if not st.session_state["authenticated"]:
-        st.markdown("<h2 style='text-align: center;'>🔐 Institutional Terminal Access</h2>", unsafe_allow_html=True)
+        st.markdown("🔐 Institutional Terminal Access", unsafe_allow_html=True)
         col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
         with col_l2:
             input_user = st.text_input("Username")
