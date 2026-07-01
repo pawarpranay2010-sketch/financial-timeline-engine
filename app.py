@@ -13,7 +13,7 @@ st.set_page_config(page_title="Financial Timeline Engine", layout="centered")
 
 # Universal Model Configuration
 PRIMARY_MODEL = "openrouter/free"
-FALLBACK_MODEL = "openrouter/free"
+FALLBACK_MODEL = 
 
 # Initialize session states
 if "ai_connected" not in st.session_state:
