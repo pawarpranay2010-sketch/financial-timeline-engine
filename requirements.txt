@@ -5,4 +5,5 @@ requests
 pypdf
 python-docx
 duckduckgo-search
-
+plotly
+openpyxl
