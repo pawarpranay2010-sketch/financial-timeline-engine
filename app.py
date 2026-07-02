@@ -12,8 +12,10 @@ from datetime import datetime
 st.set_page_config(page_title="Financial Timeline Engine", layout="centered")
 
 # Universal Model Configuration
-PRIMARY_MODEL = "openrouter/free"
-FALLBACK_MODEL = 
+PRIMARY_MODEL = "google"
+SECONDARY_MODEL = "groq"
+TERTIARY_MODEL = "openrouter"
+
 
 # Initialize session states
 if "ai_connected" not in st.session_state:
@@ -54,6 +56,32 @@ def extract_document_data(uploaded_file):
         return f"Error reading file text content: {str(e)}"
 
 # Secure AI thesis engine
+import google.generativeai as genai
+
+def call_google_ai_studio(prompt_text):
+    try:
+        api_key = st.secrets.get("GOOGLE_API_KEY", "")
+        if not api_key: raise ValueError("Missing Google Key")
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        res = model.generate_content(str(prompt_text))
+        if res.text: return res.text
+        raise RuntimeError("Empty response")
+    except Exception: raise
+
+def call_groq_engine(prompt_text):
+    try:
+        api_key = st.secrets.get("GROQ_API_KEY", "")
+        if not api_key: raise ValueError("Missing Groq Key")
+        endpoint = "https://groq.com"
+        headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+        payload = {"model": "llama3-8b-8192", "messages": [{"role": "user", "content": str(prompt_text)}]}
+        res = requests.post(endpoint, headers=headers, json=payload, timeout=30)
+        if res.status_code == 200:
+            return res.json()["choices"]["message"]["content"]
+        raise RuntimeError(f"Failed with status: {res.status_code}")
+    except Exception: raise
+        
 def call_openrouter_engine(prompt_text):
     """Sends financial data requests to OpenRouter securely with hard timeout retries."""
     api_key = st.secrets.get("OPENROUTER_API_KEY", "")
